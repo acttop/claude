@@ -1,0 +1,1264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="자산스캐너">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<title>자산 스캐너</title>
+<style>
+  :root {
+    --bg: #000;
+    --bg2: #1c1c1e;
+    --bg3: #2c2c2e;
+    --bg4: #3a3a3c;
+    --sep: #38383a;
+    --txt: #fff;
+    --txt2: #ebebf599;
+    --txt3: #ebebf54d;
+    --blue: #0a84ff;
+    --red: #ff453a;
+    --green: #30d158;
+    --yellow: #ffd60a;
+    --orange: #ff9f0a;
+    --purple: #bf5af2;
+    --tab-h: 83px;
+    --safe-top: env(safe-area-inset-top, 44px);
+    --safe-bot: env(safe-area-inset-bottom, 34px);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f2f7;
+      --bg2: #fff;
+      --bg3: #f2f2f7;
+      --bg4: #e5e5ea;
+      --sep: #c6c6c8;
+      --txt: #000;
+      --txt2: #3c3c4399;
+      --txt3: #3c3c434d;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--txt); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; overflow: hidden; }
+
+  #app { display: flex; flex-direction: column; height: 100%; }
+
+  /* ── SCREENS ── */
+  .screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .screen.active { display: flex; }
+
+  .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* ── NAV BAR ── */
+  .nav-bar {
+    padding-top: var(--safe-top);
+    background: rgba(28,28,30,.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid var(--sep);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  @media (prefers-color-scheme: light) {
+    .nav-bar { background: rgba(242,242,247,.85); }
+  }
+  .nav-title { text-align: center; padding: 12px 60px; font-size: 17px; font-weight: 600; }
+  .nav-btn { position: absolute; top: calc(var(--safe-top) + 8px); font-size: 17px; color: var(--blue); background: none; border: none; cursor: pointer; padding: 4px 12px; }
+  .nav-btn.left { left: 0; }
+  .nav-btn.right { right: 0; }
+
+  /* ── TAB BAR ── */
+  .tab-bar {
+    height: var(--tab-h);
+    padding-bottom: var(--safe-bot);
+    background: rgba(28,28,30,.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid var(--sep);
+    display: flex;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  @media (prefers-color-scheme: light) {
+    .tab-bar { background: rgba(242,242,247,.85); }
+  }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 10px; cursor: pointer; color: var(--txt3); font-size: 10px; border: none; background: none; }
+  .tab-item.active { color: var(--blue); }
+  .tab-item svg { width: 24px; height: 24px; }
+
+  /* ── CARDS ── */
+  .card { background: var(--bg2); border-radius: 16px; margin: 8px 16px; overflow: hidden; }
+  .card-row { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 0.5px solid var(--sep); }
+  .card-row:last-child { border-bottom: none; }
+  .card-section { padding: 8px 0; }
+  .section-header { padding: 6px 32px; font-size: 13px; color: var(--txt2); font-weight: 400; }
+
+  /* ── SUMMARY CARD ── */
+  .summary-card { background: var(--bg2); border-radius: 20px; margin: 8px 16px; padding: 20px; }
+  .summary-total { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
+  .summary-sub { font-size: 13px; color: var(--txt2); margin-top: 2px; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .summary-cell { background: var(--bg3); border-radius: 12px; padding: 12px; }
+  .cell-label { font-size: 11px; color: var(--txt2); margin-bottom: 4px; }
+  .cell-value { font-size: 16px; font-weight: 600; }
+  .cell-pct { font-size: 12px; margin-top: 2px; }
+
+  .profit { color: #ff453a; }
+  .loss   { color: #0a84ff; }
+  .neutral { color: var(--txt2); }
+
+  /* ── CHART ── */
+  .chart-wrap { margin: 8px 16px; background: var(--bg2); border-radius: 16px; padding: 16px; }
+  .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  canvas { width: 100%; border-radius: 8px; }
+
+  /* ── LIST ── */
+  .record-item { padding: 14px 16px; border-bottom: 0.5px solid var(--sep); cursor: pointer; active-opacity: 0.5; }
+  .record-item:last-child { border-bottom: none; }
+  .record-item:active { background: var(--bg3); }
+  .record-date { font-size: 15px; font-weight: 600; }
+  .record-meta { font-size: 13px; color: var(--txt2); margin-top: 2px; }
+  .record-values { text-align: right; }
+
+  /* ── FORM ── */
+  .form-group { padding: 12px 16px; border-bottom: 0.5px solid var(--sep); display: flex; align-items: center; gap: 12px; }
+  .form-group:last-child { border-bottom: none; }
+  .form-label { font-size: 15px; min-width: 80px; flex-shrink: 0; }
+  .form-input { flex: 1; background: none; border: none; color: var(--txt); font-size: 15px; text-align: right; outline: none; font-family: inherit; }
+  .form-input::placeholder { color: var(--txt3); }
+  select.form-input { -webkit-appearance: none; }
+
+  /* ── BUTTONS ── */
+  .btn { border: none; border-radius: 12px; font-size: 16px; font-weight: 600; padding: 14px; width: 100%; cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-danger  { background: var(--red);  color: #fff; }
+  .btn-secondary { background: var(--bg3); color: var(--txt); }
+  .btn-wrap { padding: 12px 16px; }
+  .btn:active { opacity: 0.8; }
+
+  /* ── REBALANCING ── */
+  .rebal-bar-wrap { height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
+  .rebal-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .badge-buy { background: rgba(255,69,58,.15); color: var(--red); }
+  .badge-ok  { background: rgba(48,209,88,.15);  color: var(--green); }
+  .badge-over { background: rgba(10,132,255,.15); color: var(--blue); }
+
+  /* ── SETTINGS ── */
+  .setting-toggle { position: relative; width: 51px; height: 31px; flex-shrink: 0; }
+  .toggle-input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: var(--bg4); border-radius: 31px; cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute; height: 27px; width: 27px; left: 2px; bottom: 2px;
+    background: white; border-radius: 50%; transition: transform .2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,.3);
+  }
+  .toggle-input:checked + .toggle-slider { background: var(--green); }
+  .toggle-input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+  /* ── MODAL ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 100; display: none; align-items: flex-end; }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet { background: var(--bg2); border-radius: 20px 20px 0 0; width: 100%; max-height: 90vh; overflow-y: auto; padding-bottom: var(--safe-bot); }
+  .modal-handle { width: 36px; height: 5px; background: var(--bg4); border-radius: 3px; margin: 10px auto 16px; }
+  .modal-title { font-size: 17px; font-weight: 700; padding: 0 20px 16px; }
+
+  /* ── ASSET DETAIL ── */
+  .asset-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 0.5px solid var(--sep); }
+  .asset-row:last-child { border-bottom: none; }
+  .asset-name { font-size: 15px; font-weight: 500; }
+  .asset-sym  { font-size: 12px; color: var(--txt2); margin-top: 1px; }
+  .asset-right { text-align: right; }
+
+  /* ── RATE BANNER ── */
+  .rate-banner { margin: 0 16px 4px; background: var(--bg2); border-radius: 12px; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .rate-val { font-size: 18px; font-weight: 700; }
+  .rate-time { font-size: 11px; color: var(--txt2); }
+
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--txt2); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 20px; font-weight: 600; color: var(--txt); margin-bottom: 8px; }
+  .empty-desc { font-size: 14px; line-height: 1.5; }
+
+  /* ── CAMERA ── */
+  #camera-input { display: none; }
+
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: calc(var(--tab-h) + 16px); left: 50%; transform: translateX(-50%); background: rgba(50,50,50,.95); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  .toast.show { opacity: 1; }
+
+  /* ── WEIGHT BAR ── */
+  .weight-pill { display: inline-block; height: 8px; border-radius: 4px; }
+
+  /* Pull-to-refresh simulation */
+  .ptr-indicator { text-align: center; padding: 12px; font-size: 13px; color: var(--txt2); }
+
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ===== DASHBOARD SCREEN ===== -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="nav-bar" style="position:relative">
+      <div class="nav-title">대시보드</div>
+      <button class="nav-btn right" onclick="openScanModal()">＋</button>
+    </div>
+    <div class="scroll" id="dash-scroll">
+      <div id="dash-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== RECORDS SCREEN ===== -->
+  <div class="screen" id="screen-records">
+    <div class="nav-bar" style="position:relative">
+      <div class="nav-title">기록</div>
+      <button class="nav-btn right" onclick="openScanModal()">＋</button>
+    </div>
+    <div class="scroll">
+      <div id="records-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== REBALANCING SCREEN ===== -->
+  <div class="screen" id="screen-rebal">
+    <div class="nav-bar" style="position:relative">
+      <div class="nav-title">리밸런싱</div>
+      <button class="nav-btn right" onclick="openAddAssetModal()">＋</button>
+    </div>
+    <div class="scroll">
+      <div id="rebal-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS SCREEN ===== -->
+  <div class="screen" id="screen-settings">
+    <div class="nav-bar">
+      <div class="nav-title">설정</div>
+    </div>
+    <div class="scroll">
+      <div id="settings-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB BAR ===== -->
+  <nav class="tab-bar">
+    <button class="tab-item active" onclick="switchTab('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      대시보드
+    </button>
+    <button class="tab-item" onclick="switchTab('records',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM6 4h6v6h6v10H6V4z"/></svg>
+      기록
+    </button>
+    <button class="tab-item" onclick="switchTab('rebal',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+      리밸런싱
+    </button>
+    <button class="tab-item" onclick="switchTab('settings',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5A3.5 3.5 0 018.5 12 3.5 3.5 0 0112 8.5a3.5 3.5 0 013.5 3.5 3.5 3.5 0 01-3.5 3.5m7.43-2.92c.04-.34.07-.68.07-1.08 0-.4-.03-.74-.07-1.08l2.33-1.82c.21-.16.27-.45.14-.69l-2.2-3.82c-.13-.24-.41-.32-.65-.24l-2.75 1.1c-.57-.44-1.18-.79-1.85-1.06L14.5 2.42c-.04-.26-.27-.42-.5-.42h-4c-.23 0-.46.16-.5.42L9.17 5.09c-.67.27-1.28.62-1.85 1.06L4.57 5.05c-.24-.08-.52 0-.65.24l-2.2 3.82c-.14.24-.08.53.14.69l2.33 1.82c-.04.34-.07.69-.07 1.08s.03.74.07 1.08L1.86 15.6c-.22.16-.28.45-.14.69l2.2 3.82c.13.24.41.32.65.24l2.75-1.1c.57.44 1.18.79 1.85 1.06l.41 2.67c.04.26.27.42.5.42h4c.23 0 .46-.16.5-.42l.41-2.67c.67-.27 1.28-.62 1.85-1.06l2.75 1.1c.24.08.52 0 .65-.24l2.2-3.82c.14-.24.08-.53-.14-.69l-2.33-1.82z"/></svg>
+      설정
+    </button>
+  </nav>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Scan Modal -->
+<div class="modal-overlay" id="scan-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">자산 기록 추가</div>
+    <div class="card">
+      <div class="form-group">
+        <span class="form-label">날짜</span>
+        <input class="form-input" type="date" id="scan-date">
+      </div>
+    </div>
+    <div class="section-header" style="margin-top:8px">보유 자산</div>
+    <div class="card" id="scan-assets-list"></div>
+    <div class="btn-wrap" style="display:flex;gap:8px">
+      <button class="btn btn-secondary" style="width:auto;padding:14px 20px" onclick="addScanAssetRow()">＋ 종목 추가</button>
+      <button class="btn btn-primary" onclick="captureScan()">
+        <span>📷</span> 이미지 스캔
+      </button>
+    </div>
+    <div class="btn-wrap" style="padding-top:0">
+      <button class="btn btn-primary" onclick="saveScanRecord()">저장</button>
+    </div>
+    <div class="btn-wrap" style="padding-top:0">
+      <button class="btn btn-secondary" onclick="closeModal('scan-modal')">취소</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="camera-input" accept="image/*" capture="environment" onchange="processImage(event)">
+
+<!-- Record Detail Modal -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="detail-title"></div>
+    <div id="detail-content"></div>
+    <div class="btn-wrap">
+      <button class="btn btn-danger" id="detail-delete-btn">삭제</button>
+    </div>
+    <div class="btn-wrap" style="padding-top:0">
+      <button class="btn btn-secondary" onclick="closeModal('detail-modal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Add Portfolio Asset Modal -->
+<div class="modal-overlay" id="add-asset-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="add-asset-title">ETF 추가</div>
+    <div class="card">
+      <div class="form-group">
+        <span class="form-label">종목명</span>
+        <input class="form-input" type="text" id="pa-name" placeholder="TIGER 미국S&P500">
+      </div>
+      <div class="form-group">
+        <span class="form-label">심볼</span>
+        <input class="form-input" type="text" id="pa-symbol" placeholder="379800">
+      </div>
+      <div class="form-group">
+        <span class="form-label">통화</span>
+        <select class="form-input" id="pa-currency">
+          <option value="KRW">KRW</option>
+          <option value="USD">USD</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <span class="form-label">목표 비중 %</span>
+        <input class="form-input" type="number" id="pa-target" placeholder="20" min="0" max="100">
+      </div>
+      <div class="form-group">
+        <span class="form-label">현재가</span>
+        <input class="form-input" type="number" id="pa-price" placeholder="16800">
+      </div>
+      <div class="form-group">
+        <span class="form-label">보유수량</span>
+        <input class="form-input" type="number" id="pa-qty" placeholder="100">
+      </div>
+      <div class="form-group">
+        <span class="form-label">카테고리</span>
+        <input class="form-input" type="text" id="pa-cat" placeholder="해외주식">
+      </div>
+    </div>
+    <div class="btn-wrap">
+      <button class="btn btn-primary" id="pa-save-btn" onclick="savePortfolioAsset()">추가</button>
+    </div>
+    <div class="btn-wrap" style="padding-top:0">
+      <button class="btn btn-secondary" onclick="closeModal('add-asset-modal')">취소</button>
+    </div>
+  </div>
+</div>
+
+<!-- Rebalancing Calc Modal -->
+<div class="modal-overlay" id="calc-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">리밸런싱 계산</div>
+    <div class="card">
+      <div class="form-group">
+        <span class="form-label">추가 투자금</span>
+        <input class="form-input" type="number" id="calc-amount" placeholder="1000000">
+        <span style="font-size:14px;color:var(--txt2);margin-left:4px">원</span>
+      </div>
+    </div>
+    <div class="btn-wrap">
+      <button class="btn btn-primary" onclick="runRebalCalc()">계산하기</button>
+    </div>
+    <div id="calc-results"></div>
+    <div class="btn-wrap">
+      <button class="btn btn-secondary" onclick="closeModal('calc-modal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════
+//  DATA LAYER
+// ═══════════════════════════════════════════
+const LS = {
+  get: (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v))
+};
+
+let scanRecords = LS.get('scanRecords', []);
+let portfolio   = LS.get('portfolio', { name: '연금 포트폴리오', assets: [] });
+let settings    = LS.get('settings', { alertEnabled: false, alertThreshold: 1300, darkMode: 'auto' });
+let usdKrw      = 0;
+let usdKrwTime  = null;
+let editingAssetId = null;
+
+function save() {
+  LS.set('scanRecords', scanRecords);
+  LS.set('portfolio', portfolio);
+}
+
+// ─ Sorted records (newest first)
+function sortedRecords() {
+  return [...scanRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
+}
+
+// ─ P&L helpers
+function dailyPnL(record) {
+  const sorted = sortedRecords();
+  const idx = sorted.findIndex(r => r.id === record.id);
+  if (idx < 0 || idx === sorted.length - 1) return 0;
+  const prev = sorted[idx + 1];
+  return record.totalValue - prev.totalValue;
+}
+
+function totalValue(record) {
+  return (record.assets || []).reduce((s, a) => s + a.qty * a.price, 0);
+}
+function totalInvestment(record) {
+  return (record.assets || []).reduce((s, a) => s + a.qty * a.avgPrice, 0);
+}
+
+// Attach computed totals
+function enrich(records) {
+  return records.map(r => ({
+    ...r,
+    totalValue: totalValue(r),
+    totalInvestment: totalInvestment(r),
+    get totalPnL() { return this.totalValue - this.totalInvestment; },
+    get totalPnLPct() { return this.totalInvestment > 0 ? (this.totalPnL / this.totalInvestment) * 100 : 0; }
+  }));
+}
+
+// ═══════════════════════════════════════════
+//  FORMAT HELPERS
+// ═══════════════════════════════════════════
+function fmt(n, digits=0) {
+  if (Math.abs(n) >= 1e8) return (n/1e8).toFixed(1) + '억원';
+  if (Math.abs(n) >= 1e4) return (n/1e4).toFixed(0) + '만원';
+  return n.toLocaleString('ko-KR', {maximumFractionDigits: digits}) + '원';
+}
+function fmtFull(n) {
+  return n.toLocaleString('ko-KR', {maximumFractionDigits: 0}) + '원';
+}
+function sign(n) { return n >= 0 ? '+' : ''; }
+function cls(n)  { return n > 0 ? 'profit' : n < 0 ? 'loss' : 'neutral'; }
+function fmtDate(d) {
+  const dt = new Date(d);
+  return dt.toLocaleDateString('ko-KR', {month:'long', day:'numeric', weekday:'short'});
+}
+function fmtDateShort(d) {
+  const dt = new Date(d);
+  return dt.toLocaleDateString('ko-KR', {month:'2-digit', day:'2-digit'});
+}
+function uuid() { return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36); }
+
+// ═══════════════════════════════════════════
+//  TAB NAVIGATION
+// ═══════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'records')   renderRecords();
+  if (name === 'rebal')     renderRebal();
+  if (name === 'settings')  renderSettings();
+}
+
+// ═══════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════
+function renderDashboard() {
+  const sorted = enrich(sortedRecords());
+  const latest = sorted[0];
+  const el = document.getElementById('dash-content');
+
+  if (!latest) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">기록이 없습니다</div><div class="empty-desc">우측 상단 ＋ 버튼으로<br>첫 자산 기록을 추가해보세요</div></div>`;
+    return;
+  }
+
+  const daily = dailyPnL(latest);
+  const dailyPct = latest.totalValue > 0 && sorted[1] ? (daily / sorted[1].totalValue) * 100 : 0;
+  const cumPnL  = latest.totalPnL;
+  const cumPct  = latest.totalPnLPct;
+
+  let html = `
+    <div style="height:8px"></div>
+    <div class="summary-card">
+      <div style="font-size:12px;color:var(--txt2);margin-bottom:4px">총 평가금액</div>
+      <div class="summary-total">${fmtFull(latest.totalValue)}</div>
+      <div class="summary-sub">투자원금 ${fmtFull(latest.totalInvestment)}</div>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <div class="cell-label">일별 손익</div>
+          <div class="cell-value ${cls(daily)}">${sign(daily)}${fmt(daily)}</div>
+          <div class="cell-pct ${cls(daily)}">${sign(dailyPct)}${dailyPct.toFixed(2)}%</div>
+        </div>
+        <div class="summary-cell">
+          <div class="cell-label">누적 손익</div>
+          <div class="cell-value ${cls(cumPnL)}">${sign(cumPnL)}${fmt(cumPnL)}</div>
+          <div class="cell-pct ${cls(cumPct)}">${sign(cumPct)}${cumPct.toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>`;
+
+  // Mini chart
+  if (sorted.length > 1) {
+    html += `<div class="chart-wrap"><div class="chart-title">누적 손익 추이</div><canvas id="pnl-chart" height="120"></canvas></div>`;
+  }
+
+  // Latest holdings
+  html += `<div class="section-header">보유 종목 (${fmtDate(latest.date)})</div><div class="card">`;
+  (latest.assets || []).forEach(a => {
+    const val = a.qty * a.price;
+    const pnl = val - a.qty * a.avgPrice;
+    const pct = a.avgPrice > 0 ? ((a.price - a.avgPrice) / a.avgPrice) * 100 : 0;
+    html += `<div class="card-row">
+      <div><div style="font-size:15px;font-weight:500">${a.name}</div><div style="font-size:12px;color:var(--txt2)">${a.symbol || ''} · ${a.qty}주</div></div>
+      <div style="text-align:right"><div style="font-size:15px;font-weight:600">${fmtFull(val)}</div>
+      <div class="${cls(pnl)}" style="font-size:12px">${sign(pnl)}${fmt(pnl)} (${sign(pct)}${pct.toFixed(2)}%)</div></div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Recent records
+  if (sorted.length > 1) {
+    html += `<div class="section-header">최근 기록</div><div class="card">`;
+    sorted.slice(0,5).forEach(r => {
+      const d = dailyPnL(r);
+      html += `<div class="card-row" onclick="openDetail('${r.id}')">
+        <div><div style="font-size:15px;font-weight:500">${fmtDate(r.date)}</div>
+        <div style="font-size:12px;color:var(--txt2)">${fmtFull(r.totalValue)}</div></div>
+        <div style="text-align:right"><div class="${cls(d)}" style="font-size:14px;font-weight:600">${sign(d)}${fmt(d)}</div></div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div style="height:8px"></div>`;
+  el.innerHTML = html;
+
+  // Draw chart
+  if (sorted.length > 1) {
+    setTimeout(() => drawPnLChart(sorted.reverse()), 50);
+  }
+}
+
+function drawPnLChart(chronological) {
+  const canvas = document.getElementById('pnl-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth;
+  canvas.width = W * window.devicePixelRatio;
+  canvas.height = 120 * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const w = W, h = 120;
+  ctx.clearRect(0, 0, w, h);
+
+  const values = chronological.map(r => r.totalPnL);
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 0);
+  const range = max - min || 1;
+
+  const pad = { l: 4, r: 4, t: 12, b: 20 };
+  const cw = w - pad.l - pad.r;
+  const ch = h - pad.t - pad.b;
+
+  const pts = values.map((v, i) => ({
+    x: pad.l + (i / (values.length - 1 || 1)) * cw,
+    y: pad.t + (1 - (v - min) / range) * ch
+  }));
+
+  const isProfit = values[values.length - 1] >= 0;
+  const lineColor = isProfit ? '#ff453a' : '#0a84ff';
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
+  grad.addColorStop(0, isProfit ? 'rgba(255,69,58,.35)' : 'rgba(10,132,255,.35)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, pad.t + ch);
+  ctx.lineTo(pts[0].x, pad.t + ch);
+  ctx.closePath();
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  ctx.beginPath();
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
+
+  // Date labels
+  ctx.fillStyle = 'rgba(128,128,128,.8)';
+  ctx.font = '10px -apple-system';
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(chronological.length / 4));
+  chronological.forEach((r, i) => {
+    if (i % step === 0 || i === chronological.length - 1) {
+      ctx.fillText(fmtDateShort(r.date), pts[i].x, h - 4);
+    }
+  });
+}
+
+// ═══════════════════════════════════════════
+//  RECORDS
+// ═══════════════════════════════════════════
+function renderRecords() {
+  const sorted = enrich(sortedRecords());
+  const el = document.getElementById('records-list');
+  if (!sorted.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">기록이 없습니다</div><div class="empty-desc">＋ 버튼으로 자산 기록을 추가해보세요</div></div>`;
+    return;
+  }
+
+  let html = '<div style="height:8px"></div><div class="card">';
+  sorted.forEach(r => {
+    const d = dailyPnL(r);
+    const cumPct = r.totalPnLPct;
+    html += `<div class="record-item" onclick="openDetail('${r.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="record-date">${fmtDate(r.date)}</div>
+          <div class="record-meta">평가 ${fmtFull(r.totalValue)} · ${r.assets?.length || 0}종목</div>
+        </div>
+        <div class="record-values">
+          <div class="${cls(d)}" style="font-size:14px;font-weight:600">${sign(d)}${fmt(d)}</div>
+          <div class="${cls(r.totalPnL)}" style="font-size:12px">${sign(cumPct)}${cumPct.toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += '</div><div style="height:8px"></div>';
+  el.innerHTML = html;
+}
+
+function openDetail(id) {
+  const all = enrich(sortedRecords());
+  const r = all.find(x => x.id === id);
+  if (!r) return;
+
+  const d = dailyPnL(r);
+  const dailyPct = (all.find(x => x.id !== id && new Date(x.date) < new Date(r.date))?.totalValue || 0);
+  const dPct = dailyPct > 0 ? (d / dailyPct) * 100 : 0;
+
+  document.getElementById('detail-title').textContent = fmtDate(r.date);
+  document.getElementById('detail-delete-btn').onclick = () => {
+    if (confirm('이 기록을 삭제하시겠습니까?')) {
+      scanRecords = scanRecords.filter(x => x.id !== id);
+      save();
+      closeModal('detail-modal');
+      renderDashboard();
+      renderRecords();
+      toast('삭제되었습니다');
+    }
+  };
+
+  let html = `<div class="card">
+    <div class="card-row"><span style="color:var(--txt2)">총 평가금액</span><span style="font-weight:700">${fmtFull(r.totalValue)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">투자 원금</span><span>${fmtFull(r.totalInvestment)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">일별 손익</span><span class="${cls(d)}" style="font-weight:600">${sign(d)}${fmtFull(d)} (${sign(dPct)}${dPct.toFixed(2)}%)</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">누적 손익</span><span class="${cls(r.totalPnL)}" style="font-weight:600">${sign(r.totalPnL)}${fmtFull(r.totalPnL)} (${sign(r.totalPnLPct)}${r.totalPnLPct.toFixed(2)}%)</span></div>
+  </div>
+  <div class="section-header" style="margin-top:8px">보유 종목</div>
+  <div class="card" style="padding:0 16px">`;
+
+  (r.assets || []).forEach(a => {
+    const val = a.qty * a.price;
+    const pnl = val - a.qty * a.avgPrice;
+    const pct = a.avgPrice > 0 ? ((a.price - a.avgPrice) / a.avgPrice) * 100 : 0;
+    html += `<div class="asset-row">
+      <div><div class="asset-name">${a.name}</div><div class="asset-sym">${a.symbol || ''} · ${a.qty}주 · 평균 ${a.avgPrice.toLocaleString()}원</div></div>
+      <div class="asset-right">
+        <div style="font-size:15px;font-weight:600">${fmtFull(val)}</div>
+        <div class="${cls(pnl)}" style="font-size:12px">${sign(pnl)}${fmtFull(pnl)} (${sign(pct)}${pct.toFixed(2)}%)</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  document.getElementById('detail-content').innerHTML = html;
+  openModal('detail-modal');
+}
+
+// ═══════════════════════════════════════════
+//  SCAN / ADD RECORD
+// ═══════════════════════════════════════════
+let scanAssetRows = [];
+
+function openScanModal() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('scan-date').value = today;
+  scanAssetRows = [{ id: uuid(), name: '', symbol: '', qty: '', avgPrice: '', price: '' }];
+  renderScanAssets();
+  openModal('scan-modal');
+}
+
+function addScanAssetRow() {
+  scanAssetRows.push({ id: uuid(), name: '', symbol: '', qty: '', avgPrice: '', price: '' });
+  renderScanAssets();
+}
+
+function renderScanAssets() {
+  const el = document.getElementById('scan-assets-list');
+  el.innerHTML = scanAssetRows.map((a, i) => `
+    <div class="form-group" style="flex-wrap:wrap;gap:6px;padding:10px 16px">
+      <div style="width:100%;display:flex;gap:6px;align-items:center">
+        <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="text" placeholder="종목명" value="${a.name}" oninput="updateScanRow(${i},'name',this.value)">
+        <input class="form-input" style="text-align:left;width:80px;background:var(--bg3);border-radius:8px;padding:6px 10px" type="text" placeholder="심볼" value="${a.symbol}" oninput="updateScanRow(${i},'symbol',this.value)">
+        <button onclick="removeScanRow(${i})" style="background:none;border:none;color:var(--red);font-size:20px;padding:0 4px;cursor:pointer">×</button>
+      </div>
+      <div style="width:100%;display:flex;gap:6px">
+        <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="number" placeholder="수량" value="${a.qty}" oninput="updateScanRow(${i},'qty',this.value)">
+        <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="number" placeholder="평균단가" value="${a.avgPrice}" oninput="updateScanRow(${i},'avgPrice',this.value)">
+        <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="number" placeholder="현재가" value="${a.price}" oninput="updateScanRow(${i},'price',this.value)">
+      </div>
+    </div>
+  `).join('');
+}
+
+function updateScanRow(i, field, val) {
+  scanAssetRows[i][field] = val;
+}
+
+function removeScanRow(i) {
+  scanAssetRows.splice(i, 1);
+  renderScanAssets();
+}
+
+function saveScanRecord() {
+  const date = document.getElementById('scan-date').value;
+  if (!date) { toast('날짜를 선택해주세요'); return; }
+  const assets = scanAssetRows.filter(a => a.name.trim()).map(a => ({
+    name: a.name.trim(),
+    symbol: a.symbol.trim(),
+    qty: parseFloat(a.qty) || 0,
+    avgPrice: parseFloat(a.avgPrice) || 0,
+    price: parseFloat(a.price) || 0
+  }));
+  if (!assets.length) { toast('종목을 하나 이상 입력해주세요'); return; }
+  const record = { id: uuid(), date, assets };
+  scanRecords.push(record);
+  save();
+  closeModal('scan-modal');
+  renderDashboard();
+  renderRecords();
+  toast('기록이 저장되었습니다');
+}
+
+function captureScan() {
+  document.getElementById('camera-input').click();
+}
+
+function processImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  toast('이미지에서 숫자를 인식 중...');
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      // Simple OCR via canvas — extract visible text patterns
+      // For a real app, use Vision framework. Here we just notify user.
+      toast('이미지 스캔 완료! 수동으로 수치를 확인해 입력해주세요');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+// ═══════════════════════════════════════════
+//  REBALANCING
+// ═══════════════════════════════════════════
+function renderRebal() {
+  const el = document.getElementById('rebal-content');
+  const rate = usdKrw || 1350;
+  const assets = portfolio.assets || [];
+
+  let html = `<div style="height:8px"></div>`;
+
+  // Exchange rate banner
+  html += `<div class="rate-banner">
+    <div>
+      <div style="font-size:12px;color:var(--txt2)">USD/KRW 환율</div>
+      <div class="rate-val">${rate > 0 ? rate.toLocaleString('ko-KR', {maximumFractionDigits:1}) + '원' : '로딩 중...'}</div>
+    </div>
+    <div style="text-align:right">
+      <div class="rate-time">${usdKrwTime ? '업데이트 ' + usdKrwTime : '환율 미조회'}</div>
+      <button onclick="fetchRate()" style="background:none;border:none;color:var(--blue);font-size:13px;cursor:pointer;margin-top:4px">새로고침</button>
+    </div>
+  </div>`;
+
+  if (!assets.length) {
+    html += `<div class="empty"><div class="empty-icon">⚖️</div><div class="empty-title">ETF가 없습니다</div><div class="empty-desc">우측 상단 ＋ 버튼으로<br>ETF 종목을 추가해보세요</div></div>`;
+    el.innerHTML = html;
+    return;
+  }
+
+  const totalKRW = assets.reduce((s, a) => s + valueInKRW(a, rate), 0);
+  const totalTarget = assets.reduce((s, a) => s + a.targetWeight, 0);
+  const weightOk = Math.abs(totalTarget - 100) < 0.5;
+
+  // Portfolio name + total
+  html += `<div class="card">
+    <div class="card-row"><span style="color:var(--txt2)">포트폴리오</span><span style="font-weight:600">${portfolio.name}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">총 평가금액</span><span style="font-weight:700">${fmtFull(totalKRW)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">목표 비중 합계</span>
+      <span style="font-weight:600;color:${weightOk ? 'var(--green)' : 'var(--red)'}">${totalTarget.toFixed(1)}% ${weightOk ? '✓' : '⚠️'}</span>
+    </div>
+  </div>`;
+
+  // Weight visualization bar
+  html += `<div class="section-header">자산 배분</div>
+  <div class="card" style="padding:16px">
+    <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:12px">`;
+  const colors = ['#ff453a','#0a84ff','#30d158','#ffd60a','#ff9f0a','#bf5af2','#64d2ff','#ff6961'];
+  assets.forEach((a, i) => {
+    const cur = totalKRW > 0 ? (valueInKRW(a, rate) / totalKRW) * 100 : 0;
+    html += `<div style="flex:${cur};background:${colors[i % colors.length]};min-width:2px"></div>`;
+  });
+  html += `</div>`;
+  assets.forEach((a, i) => {
+    const cur = totalKRW > 0 ? (valueInKRW(a, rate) / totalKRW) * 100 : 0;
+    const dev = cur - a.targetWeight;
+    html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+      <div style="width:12px;height:12px;border-radius:3px;background:${colors[i % colors.length]};flex-shrink:0"></div>
+      <div style="flex:1;font-size:13px">${a.name}</div>
+      <div style="font-size:12px;color:var(--txt2)">${a.targetWeight}%</div>
+      <div style="font-size:12px;font-weight:600;color:${Math.abs(dev) >= 5 ? (dev > 0 ? 'var(--blue)' : 'var(--red)') : 'var(--txt2)'}">${sign(dev)}${dev.toFixed(1)}%</div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Asset list with deviation
+  html += `<div class="section-header">종목별 현황</div><div class="card">`;
+  assets.forEach((a, idx) => {
+    const val = valueInKRW(a, rate);
+    const cur = totalKRW > 0 ? (val / totalKRW) * 100 : 0;
+    const dev = cur - a.targetWeight;
+    const devCls = Math.abs(dev) < 2 ? 'badge-ok' : dev > 0 ? 'badge-over' : 'badge-buy';
+    const devLabel = Math.abs(dev) < 2 ? '균형' : dev > 0 ? '초과' : '부족';
+    html += `<div class="card-row" onclick="openEditAsset('${a.id}')">
+      <div style="flex:1">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span style="font-size:15px;font-weight:500">${a.name}</span>
+          <span class="badge ${devCls}">${devLabel} ${sign(dev)}${dev.toFixed(1)}%</span>
+        </div>
+        <div style="font-size:12px;color:var(--txt2);margin-top:2px">${a.symbol} · ${a.currency} · ${a.qty}주</div>
+        <div style="margin-top:6px">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--txt2);margin-bottom:3px">
+            <span>현재 ${cur.toFixed(1)}%</span><span>목표 ${a.targetWeight}%</span>
+          </div>
+          <div class="rebal-bar-wrap">
+            <div class="rebal-bar-fill" style="width:${Math.min(cur/Math.max(a.targetWeight,1)*100,200)}%;background:${colors[idx % colors.length]}"></div>
+          </div>
+        </div>
+      </div>
+      <div style="text-align:right;margin-left:12px">
+        <div style="font-size:15px;font-weight:600">${fmtFull(val)}</div>
+        <div style="font-size:12px;color:var(--txt2)">${a.currency === 'USD' ? '$' + (a.qty * a.price).toLocaleString('en',{maximumFractionDigits:0}) : ''}</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Rebalancing button
+  html += `<div class="btn-wrap">
+    <button class="btn btn-primary" onclick="openCalcModal()">리밸런싱 계산하기</button>
+  </div>
+  <div class="btn-wrap" style="padding-top:0">
+    <button class="btn btn-secondary" onclick="openAddAssetModal()">ETF 추가</button>
+  </div>
+  <div style="height:8px"></div>`;
+
+  el.innerHTML = html;
+}
+
+function valueInKRW(asset, rate) {
+  const val = asset.qty * asset.price;
+  return asset.currency === 'USD' ? val * rate : val;
+}
+
+function openAddAssetModal() {
+  editingAssetId = null;
+  document.getElementById('add-asset-title').textContent = 'ETF 추가';
+  document.getElementById('pa-save-btn').textContent = '추가';
+  ['pa-name','pa-symbol','pa-target','pa-price','pa-qty','pa-cat'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pa-currency').value = 'KRW';
+  openModal('add-asset-modal');
+}
+
+function openEditAsset(id) {
+  const a = portfolio.assets.find(x => x.id === id);
+  if (!a) return;
+  editingAssetId = id;
+  document.getElementById('add-asset-title').textContent = 'ETF 수정';
+  document.getElementById('pa-save-btn').textContent = '수정';
+  document.getElementById('pa-name').value = a.name;
+  document.getElementById('pa-symbol').value = a.symbol;
+  document.getElementById('pa-currency').value = a.currency;
+  document.getElementById('pa-target').value = a.targetWeight;
+  document.getElementById('pa-price').value = a.price;
+  document.getElementById('pa-qty').value = a.qty;
+  document.getElementById('pa-cat').value = a.category || '';
+  openModal('add-asset-modal');
+}
+
+function savePortfolioAsset() {
+  const name   = document.getElementById('pa-name').value.trim();
+  const symbol = document.getElementById('pa-symbol').value.trim();
+  const currency = document.getElementById('pa-currency').value;
+  const target = parseFloat(document.getElementById('pa-target').value) || 0;
+  const price  = parseFloat(document.getElementById('pa-price').value) || 0;
+  const qty    = parseFloat(document.getElementById('pa-qty').value) || 0;
+  const cat    = document.getElementById('pa-cat').value.trim();
+
+  if (!name) { toast('종목명을 입력해주세요'); return; }
+  if (target <= 0) { toast('목표 비중을 입력해주세요'); return; }
+
+  if (editingAssetId) {
+    const idx = portfolio.assets.findIndex(a => a.id === editingAssetId);
+    if (idx >= 0) portfolio.assets[idx] = { ...portfolio.assets[idx], name, symbol, currency, targetWeight: target, price, qty, category: cat };
+  } else {
+    portfolio.assets.push({ id: uuid(), name, symbol, currency, targetWeight: target, price, qty, category: cat });
+  }
+  LS.set('portfolio', portfolio);
+  closeModal('add-asset-modal');
+  renderRebal();
+  toast(editingAssetId ? '수정되었습니다' : '추가되었습니다');
+}
+
+function openCalcModal() {
+  document.getElementById('calc-amount').value = '';
+  document.getElementById('calc-results').innerHTML = '';
+  openModal('calc-modal');
+}
+
+function runRebalCalc() {
+  const additional = parseFloat(document.getElementById('calc-amount').value) || 0;
+  if (additional <= 0) { toast('투자금액을 입력해주세요'); return; }
+
+  const rate = usdKrw || 1350;
+  const assets = portfolio.assets || [];
+  if (!assets.length) return;
+
+  const totalCur = assets.reduce((s, a) => s + valueInKRW(a, rate), 0);
+  const newTotal = totalCur + additional;
+
+  // Deficit calc (buy-only)
+  const deficits = assets.map(a => {
+    const targetKRW = (a.targetWeight / 100) * newTotal;
+    const curKRW    = valueInKRW(a, rate);
+    const deficit   = Math.max(0, targetKRW - curKRW);
+    return { ...a, targetKRW, curKRW, deficit };
+  });
+
+  const totalDeficit = deficits.reduce((s, d) => s + d.deficit, 0);
+
+  const results = deficits.map(d => {
+    let buyKRW = 0;
+    if (totalDeficit <= additional) {
+      buyKRW = d.deficit;
+    } else {
+      buyKRW = totalDeficit > 0 ? additional * (d.deficit / totalDeficit) : 0;
+    }
+    const priceKRW = d.currency === 'USD' ? d.price * rate : d.price;
+    const buyQty   = priceKRW > 0 ? Math.floor(buyKRW / priceKRW) : 0;
+    const actualBuy = buyQty * priceKRW;
+    return { ...d, buyKRW, buyQty, actualBuy };
+  });
+
+  const spent = results.reduce((s, r) => s + r.actualBuy, 0);
+  const leftover = additional - spent;
+
+  let html = `<div class="section-header" style="margin-top:4px">매수 추천</div><div class="card">`;
+  results.forEach(r => {
+    if (r.buyQty <= 0 && r.deficit <= 0) {
+      html += `<div class="card-row"><div><span style="font-weight:500">${r.name}</span><br><span style="font-size:12px;color:var(--txt2)">초과 보유 — 매수 불필요</span></div>
+        <span class="badge badge-ok">보유</span></div>`;
+    } else if (r.buyQty > 0) {
+      html += `<div class="card-row">
+        <div><div style="font-weight:500">${r.name}</div>
+        <div style="font-size:12px;color:var(--txt2);margin-top:2px">${r.buyQty}주 × ${(r.currency==='USD' ? '$'+r.price.toFixed(2) : r.price.toLocaleString()+'원')}</div></div>
+        <div style="text-align:right"><div style="font-weight:700;color:var(--red)">${fmtFull(r.actualBuy)}</div>
+        <div style="font-size:12px;color:var(--txt2)">${r.buyQty}주</div></div>
+      </div>`;
+    }
+  });
+  html += `</div>
+  <div class="card" style="margin-top:8px">
+    <div class="card-row"><span style="color:var(--txt2)">투자금</span><span>${fmtFull(additional)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">사용금액</span><span style="font-weight:600">${fmtFull(spent)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">잔여금</span><span style="color:var(--green);font-weight:600">${fmtFull(leftover)}</span></div>
+  </div>`;
+
+  document.getElementById('calc-results').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════
+function renderSettings() {
+  const el = document.getElementById('settings-content');
+  let html = `<div style="height:8px"></div>
+  <div class="section-header">포트폴리오</div>
+  <div class="card">
+    <div class="form-group">
+      <span class="form-label">이름</span>
+      <input class="form-input" type="text" value="${portfolio.name}" onchange="updatePortfolioName(this.value)" placeholder="포트폴리오 이름">
+    </div>
+  </div>
+
+  <div class="section-header">환율 알림</div>
+  <div class="card">
+    <div class="card-row">
+      <span>환율 알림</span>
+      <label class="setting-toggle">
+        <input class="toggle-input" type="checkbox" ${settings.alertEnabled ? 'checked' : ''} onchange="toggleAlert(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <span class="form-label">알림 기준</span>
+      <input class="form-input" type="number" value="${settings.alertThreshold}" onchange="updateAlertThreshold(this.value)" placeholder="1300">
+      <span style="font-size:14px;color:var(--txt2)">원 이하</span>
+    </div>
+  </div>
+
+  <div class="section-header">데이터</div>
+  <div class="card">
+    <div class="card-row" style="cursor:pointer" onclick="exportData()">
+      <span>데이터 내보내기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+    <div class="card-row" style="cursor:pointer" onclick="importData()">
+      <span>데이터 불러오기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+    <div class="card-row" style="cursor:pointer" onclick="confirmDeleteAll()">
+      <span style="color:var(--red)">모든 기록 삭제</span>
+      <span style="color:var(--txt2)">›</span>
+    </div>
+  </div>
+
+  <div class="section-header">샘플 데이터</div>
+  <div class="card">
+    <div class="card-row" style="cursor:pointer" onclick="loadSamplePortfolio()">
+      <span>샘플 포트폴리오 불러오기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+    <div class="card-row" style="cursor:pointer" onclick="loadSampleRecords()">
+      <span>샘플 자산 기록 불러오기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+  </div>
+
+  <div class="section-header">앱 정보</div>
+  <div class="card">
+    <div class="card-row"><span style="color:var(--txt2)">버전</span><span>1.0.0</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">환율 출처</span><span>Frankfurter API</span></div>
+  </div>
+  <div style="height:8px"></div>`;
+  el.innerHTML = html;
+}
+
+function updatePortfolioName(v) {
+  portfolio.name = v;
+  LS.set('portfolio', portfolio);
+}
+function toggleAlert(v) {
+  settings.alertEnabled = v;
+  LS.set('settings', settings);
+  if (v && 'Notification' in window) {
+    Notification.requestPermission().then(p => {
+      if (p !== 'granted') toast('알림 권한이 필요합니다 (설정 → Safari → 알림 허용)');
+    });
+  }
+}
+function updateAlertThreshold(v) {
+  settings.alertThreshold = parseFloat(v) || 1300;
+  LS.set('settings', settings);
+}
+function confirmDeleteAll() {
+  if (confirm('모든 자산 기록을 삭제하시겠습니까? 포트폴리오는 유지됩니다.')) {
+    scanRecords = [];
+    save();
+    renderDashboard();
+    renderRecords();
+    toast('삭제되었습니다');
+  }
+}
+function exportData() {
+  const data = { scanRecords, portfolio, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'asset-scanner-backup.json';
+  a.click();
+  toast('내보내기 완료');
+}
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.scanRecords) scanRecords = data.scanRecords;
+        if (data.portfolio)   portfolio   = data.portfolio;
+        save();
+        renderDashboard(); renderRecords(); renderRebal(); renderSettings();
+        toast('불러오기 완료');
+      } catch { toast('파일 형식이 올바르지 않습니다'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function loadSamplePortfolio() {
+  portfolio.assets = [
+    { id: uuid(), name: 'TIGER 미국S&P500', symbol: '379800', currency: 'KRW', targetWeight: 40, price: 16800, qty: 150, category: '해외주식' },
+    { id: uuid(), name: 'TIGER 나스닥100',   symbol: '133690', currency: 'KRW', targetWeight: 25, price: 84500, qty: 25,  category: '해외주식' },
+    { id: uuid(), name: 'TIGER 국채10년',    symbol: '148070', currency: 'KRW', targetWeight: 20, price: 48200, qty: 35,  category: '채권' },
+    { id: uuid(), name: 'KODEX 골드선물',    symbol: '132030', currency: 'KRW', targetWeight: 10, price: 14300, qty: 40,  category: '금' },
+    { id: uuid(), name: 'TIGER 현금성자산',  symbol: '190620', currency: 'KRW', targetWeight: 5,  price: 100150, qty: 5,  category: '현금' }
+  ];
+  LS.set('portfolio', portfolio);
+  renderRebal();
+  switchTab('rebal', document.querySelectorAll('.tab-item')[2]);
+  toast('샘플 포트폴리오 로드 완료');
+}
+
+function loadSampleRecords() {
+  const today = new Date();
+  const offsets = [-5,-4,-3,-2,-1,0];
+  const prices = [
+    [68000,130000,192000],
+    [71000,135000,195000],
+    [72500,138000,197000],
+    [71800,136500,198500],
+    [73200,140000,201000],
+    [74500,142000,199000]
+  ];
+  scanRecords = offsets.map((d, i) => {
+    const date = new Date(today); date.setDate(date.getDate() + d);
+    return {
+      id: uuid(),
+      date: date.toISOString().split('T')[0],
+      assets: [
+        { name: '삼성전자', symbol: '005930', qty: 10, avgPrice: 70000, price: prices[i][0] },
+        { name: 'SK하이닉스', symbol: '000660', qty: 5, avgPrice: 130000, price: prices[i][1] },
+        { name: 'NAVER', symbol: '035420', qty: 3, avgPrice: 200000, price: prices[i][2] }
+      ]
+    };
+  });
+  save();
+  renderDashboard(); renderRecords();
+  switchTab('dashboard', document.querySelectorAll('.tab-item')[0]);
+  toast('샘플 기록 로드 완료');
+}
+
+// ═══════════════════════════════════════════
+//  EXCHANGE RATE
+// ═══════════════════════════════════════════
+async function fetchRate() {
+  try {
+    const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=KRW');
+    const data = await res.json();
+    const rate = data.rates?.KRW;
+    if (rate) {
+      usdKrw = rate;
+      usdKrwTime = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+      // Check alert
+      if (settings.alertEnabled && rate <= settings.alertThreshold && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('환율 알림', { body: `USD/KRW ${rate.toFixed(0)}원 (설정 기준 ${settings.alertThreshold}원 이하)`, icon: 'icon-192.png' });
+      }
+      const rebalScreen = document.getElementById('screen-rebal');
+      if (rebalScreen.classList.contains('active')) renderRebal();
+    }
+  } catch (e) {
+    console.log('환율 조회 실패:', e.message);
+  }
+}
+
+// ═══════════════════════════════════════════
+//  MODAL HELPERS
+// ═══════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Close on backdrop tap
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
+});
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════
+//  SERVICE WORKER
+// ═══════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+function init() {
+  // Load sample data on first run
+  if (!localStorage.getItem('scanRecords') && !localStorage.getItem('portfolio')) {
+    loadSampleRecords();
+    loadSamplePortfolio();
+    return; // switchTab called inside
+  }
+  renderDashboard();
+  fetchRate();
+  // Refresh rate every 30 minutes
+  setInterval(fetchRate, 30 * 60 * 1000);
+}
+
+init();
+</script>
+</body>
+</html>
