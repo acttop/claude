@@ -905,17 +905,33 @@ async function runOCR(dataURL) {
   }
 }
 
-// OCR 텍스트 파싱 — 라벨 구조(연금계좌현황 등) 우선, 실패 시 일반 휴리스틱
+// OCR 텍스트 파싱 — 라벨 구조 → 컴팩트 잔고 목록 → 일반 휴리스틱 순으로 시도
 function parseAssetsFromText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const structured = parseStructuredBlocks(lines);
   if (structured.length) return structured;
+  const compact = parseCompactBlocks(lines);
+  if (compact.length) return compact;
   return parseGenericBlocks(lines);
 }
 
 function ocrNum(s) {
   const m = s.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/);
   return m ? parseFloat(m[0].replace(/,/g, '')) : null;
+}
+
+// OCR 상품명 후처리: 끝에 붙는 노이즈 제거
+function cleanOcrName(name) {
+  let s = name;
+  // 후미 소문자 한 글자 제거 ("적격 f" → "적격")
+  s = s.replace(/\s+[a-z]$/i, m => /[A-Z]/.test(m) ? m : '');
+  // 후미 한글 한 글자 괄호 제거 ("액티브(너)" → "액티브")
+  s = s.replace(/\([가-힣]\)\s*$/, '');
+  // 닫는 괄호가 여는 괄호보다 많으면 맨 뒤 ) 제거
+  const op = (s.match(/\(/g) || []).length;
+  const cl = (s.match(/\)/g) || []).length;
+  if (cl > op) s = s.replace(/\)\s*$/, '');
+  return s.trim();
 }
 
 // 증권앱 라벨 구조 파싱:
@@ -982,16 +998,83 @@ function parseStructuredBlocks(lines) {
       if (investment && (!avgPrice || Math.abs(qty * avgPrice - investment) / investment > 0.05)) {
         avgPrice = Math.round(investment / qty);
       }
-      results.push({
-        name,
-        buyAmount: investment || Math.round(qty * (avgPrice || 0)),
-        qty,
-        avgPrice: avgPrice || 0,
-        evalAmount: value,
-        structured: true
-      });
+      const cleanName = cleanOcrName(name);
+      const normName = cleanName.replace(/\s+/g, '').toLowerCase();
+      // 동일 이름 중복 방지
+      if (!results.some(r => r.name.replace(/\s+/g, '').toLowerCase() === normName)) {
+        results.push({
+          name: cleanName,
+          buyAmount: investment || Math.round(qty * (avgPrice || 0)),
+          qty,
+          avgPrice: avgPrice || 0,
+          evalAmount: value,
+          structured: true
+        });
+      }
       i = consumed;
     }
+  }
+  return results;
+}
+
+// 컴팩트 잔고 목록 파싱 (잔고 화면):
+//   TIGER 미국S&P500         77,546,000원
+//   2800주 · 평단 24,465원   +904만원 (+13.20%)
+// "N주 · 평단 N원" 패턴을 앵커로 사용
+function parseCompactBlocks(lines) {
+  const results = [];
+  // "N주 · 평단 N원" — 중점(·) 또는 일반 점, OCR 오차 허용
+  const qtyRe = /(\d{1,3}(?:,\d{3})*)\s*주\s*[·・.]\s*평단\s*(\d{1,3}(?:,\d{3})*)\s*원/;
+
+  for (let i = 1; i < lines.length; i++) {
+    const qm = lines[i].match(qtyRe);
+    if (!qm) continue;
+
+    const qty = parseFloat(qm[1].replace(/,/g, ''));
+    const avgPrice = parseFloat(qm[2].replace(/,/g, ''));
+    if (qty <= 0 || avgPrice <= 0) continue;
+
+    // 위 1~2줄에서 종목명과 평가금액 탐색
+    let name = null, evalAmount = null;
+    for (let k = i - 1; k >= Math.max(0, i - 2); k--) {
+      const prev = lines[k];
+      // 이 줄에 금액(원)이 포함된 경우 — 종목명과 평가금액이 같은 줄
+      const amtM = prev.match(/(\d{1,3}(?:,\d{3})+)\s*원/);
+      if (amtM) {
+        const v = parseFloat(amtM[1].replace(/,/g, ''));
+        if (v > avgPrice) { // 평단가보다 커야 평가금액
+          evalAmount = v;
+          const namePart = prev.slice(0, prev.indexOf(amtM[0])).replace(/[<>›〉‹▲▼]/g, '').trim();
+          if (namePart.length >= 2) name = cleanOcrName(namePart.replace(/\s+/g, ' '));
+        }
+      } else if (!name && prev.length >= 2 && !/^[\d,.\s%+\-원주·]+$/.test(prev)) {
+        name = cleanOcrName(prev.replace(/[<>›〉‹▲▼]/g, '').replace(/\s+/g, ' ').trim());
+      }
+      if (name && evalAmount) break;
+    }
+
+    // 평가금액이 같은 줄에 없으면 바로 위 줄에서 별도 탐색
+    if (!evalAmount) {
+      for (let k = Math.max(0, i - 2); k < i; k++) {
+        const amtM = lines[k].match(/(\d{1,3}(?:,\d{3})+)\s*원/);
+        if (amtM) {
+          const v = parseFloat(amtM[1].replace(/,/g, ''));
+          if (v > avgPrice) { evalAmount = v; break; }
+        }
+      }
+    }
+
+    if (!name || !evalAmount || qty <= 0) continue;
+    const normName = name.replace(/\s+/g, '').toLowerCase();
+    if (results.some(r => r.name.replace(/\s+/g, '').toLowerCase() === normName)) continue;
+
+    results.push({
+      name,
+      buyAmount: Math.round(qty * avgPrice),
+      qty, avgPrice,
+      evalAmount,
+      structured: true
+    });
   }
   return results;
 }
