@@ -192,6 +192,7 @@
 
   /* ── CAMERA ── */
   #camera-input { display: none; }
+  #scan-img-el { display: block; }
 
   /* ── TOAST ── */
   .toast { position: fixed; bottom: calc(var(--tab-h) + 16px); left: 50%; transform: translateX(-50%); background: rgba(50,50,50,.95); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity .3s; white-space: nowrap; }
@@ -288,12 +289,17 @@
         <input class="form-input" type="date" id="scan-date">
       </div>
     </div>
+    <div id="scan-img-preview" style="display:none;margin:0 16px 4px;position:relative">
+      <img id="scan-img-el" style="width:100%;border-radius:12px;max-height:220px;object-fit:contain;background:#000" src="">
+      <button onclick="clearScanImage()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+      <div style="font-size:11px;color:var(--txt2);text-align:center;padding:6px 0">사진을 보면서 아래에 수치를 입력하세요</div>
+    </div>
     <div class="section-header" style="margin-top:8px">보유 자산</div>
     <div class="card" id="scan-assets-list"></div>
     <div class="btn-wrap" style="display:flex;gap:8px">
       <button class="btn btn-secondary" style="width:auto;padding:14px 20px" onclick="addScanAssetRow()">＋ 종목 추가</button>
       <button class="btn btn-primary" onclick="captureScan()">
-        <span>📷</span> 이미지 스캔
+        <span>📷</span> 사진 불러오기
       </button>
     </div>
     <div class="btn-wrap" style="padding-top:0">
@@ -304,7 +310,7 @@
     </div>
   </div>
 </div>
-<input type="file" id="camera-input" accept="image/*" capture="environment" onchange="processImage(event)">
+<input type="file" id="camera-input" accept="image/*" onchange="processImage(event)">
 
 <!-- Record Detail Modal -->
 <div class="modal-overlay" id="detail-modal">
@@ -713,6 +719,7 @@ function openScanModal() {
   document.getElementById('scan-date').value = today;
   scanAssetRows = [{ id: uuid(), name: '', symbol: '', qty: '', avgPrice: '', price: '' }];
   renderScanAssets();
+  clearScanImage();
   openModal('scan-modal');
 }
 
@@ -772,19 +779,45 @@ function captureScan() {
   document.getElementById('camera-input').click();
 }
 
+function clearScanImage() {
+  document.getElementById('scan-img-preview').style.display = 'none';
+  document.getElementById('scan-img-el').src = '';
+}
+
 function processImage(event) {
   const file = event.target.files[0];
   if (!file) return;
-  toast('이미지에서 숫자를 인식 중...');
   const reader = new FileReader();
   reader.onload = e => {
-    const img = new Image();
-    img.onload = () => {
-      // Simple OCR via canvas — extract visible text patterns
-      // For a real app, use Vision framework. Here we just notify user.
-      toast('이미지 스캔 완료! 수동으로 수치를 확인해 입력해주세요');
-    };
-    img.src = e.target.result;
+    // Show preview
+    const imgEl = document.getElementById('scan-img-el');
+    imgEl.src = e.target.result;
+    document.getElementById('scan-img-preview').style.display = 'block';
+
+    // Try TextDetector API (Chrome/Android; not available on iOS Safari)
+    if ('TextDetector' in window) {
+      const img = new Image();
+      img.onload = async () => {
+        try {
+          const detector = new TextDetector();
+          const texts = await detector.detect(img);
+          const numbers = texts
+            .map(t => t.rawValue.replace(/,/g, '').trim())
+            .filter(t => /^\d{3,}(\.\d+)?$/.test(t))
+            .map(Number)
+            .filter(n => n > 0)
+            .sort((a, b) => b - a);
+          if (numbers.length) {
+            toast(`숫자 ${numbers.length}개 인식 — 사진 보며 아래 입력란에 확인해 주세요`);
+          } else {
+            toast('사진을 보며 수치를 직접 입력해 주세요');
+          }
+        } catch { toast('사진을 보며 수치를 직접 입력해 주세요'); }
+      };
+      img.src = e.target.result;
+    } else {
+      toast('사진을 보며 수치를 직접 입력해 주세요');
+    }
   };
   reader.readAsDataURL(file);
   event.target.value = '';
@@ -1185,26 +1218,51 @@ function loadSampleRecords() {
 }
 
 // ═══════════════════════════════════════════
-//  EXCHANGE RATE
+//  EXCHANGE RATE  (다중 소스 폴백)
 // ═══════════════════════════════════════════
-async function fetchRate() {
-  try {
+const RATE_SOURCES = [
+  // 1차: Frankfurter (ECB 기반, 무료·CORS 허용)
+  async () => {
     const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=KRW');
     const data = await res.json();
     const rate = data.rates?.KRW;
-    if (rate) {
-      usdKrw = rate;
-      usdKrwTime = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
-      // Check alert
-      if (settings.alertEnabled && rate <= settings.alertThreshold && 'Notification' in window && Notification.permission === 'granted') {
-        new Notification('환율 알림', { body: `USD/KRW ${rate.toFixed(0)}원 (설정 기준 ${settings.alertThreshold}원 이하)`, icon: 'icon-192.png' });
-      }
-      const rebalScreen = document.getElementById('screen-rebal');
-      if (rebalScreen.classList.contains('active')) renderRebal();
-    }
-  } catch (e) {
-    console.log('환율 조회 실패:', e.message);
+    if (!rate) throw new Error('no KRW');
+    return { rate, source: 'Frankfurter' };
+  },
+  // 2차: fawazahmed0 Currency API (jsDelivr CDN, 항상 접근 가능)
+  async () => {
+    const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+    const data = await res.json();
+    const rate = data.usd?.krw;
+    if (!rate) throw new Error('no KRW');
+    return { rate: Math.round(rate), source: 'CDN(fawazahmed0)' };
+  },
+  // 3차: Open Exchange Rates (무료 플랜, 시간 1회 제한)
+  async () => {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await res.json();
+    const rate = data.rates?.KRW;
+    if (!rate) throw new Error('no KRW');
+    return { rate: Math.round(rate), source: 'open.er-api' };
   }
+];
+
+async function fetchRate() {
+  for (const fn of RATE_SOURCES) {
+    try {
+      const { rate, source } = await fn();
+      usdKrw = rate;
+      usdKrwTime = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' (' + source + ')';
+      if (settings.alertEnabled && rate <= settings.alertThreshold && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('환율 알림', { body: `USD/KRW ${rate.toFixed(0)}원 (기준 ${settings.alertThreshold}원 이하)`, icon: 'icon.svg' });
+      }
+      if (document.getElementById('screen-rebal').classList.contains('active')) renderRebal();
+      return;
+    } catch (e) {
+      console.log('환율 소스 실패, 다음 시도:', e.message);
+    }
+  }
+  console.log('모든 환율 소스 실패');
 }
 
 // ═══════════════════════════════════════════
