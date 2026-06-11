@@ -292,8 +292,9 @@
     <div id="scan-img-preview" style="display:none;margin:0 16px 4px;position:relative">
       <img id="scan-img-el" style="width:100%;border-radius:12px;max-height:220px;object-fit:contain;background:#000" src="">
       <button onclick="clearScanImage()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
-      <div style="font-size:11px;color:var(--txt2);text-align:center;padding:6px 0">사진을 보면서 아래에 수치를 입력하세요</div>
     </div>
+    <div id="ocr-status" style="display:none;margin:4px 16px;padding:10px 14px;background:var(--bg3);border-radius:10px;font-size:13px;color:var(--txt2);text-align:center"></div>
+    <div id="ocr-summary" style="display:none;margin:4px 16px;padding:10px 14px;background:var(--bg3);border-radius:10px;font-size:12px;line-height:1.7"></div>
     <div class="section-header" style="margin-top:8px">보유 자산</div>
     <div class="card" id="scan-assets-list"></div>
     <div class="btn-wrap" style="display:flex;gap:8px">
@@ -730,7 +731,9 @@ function addScanAssetRow() {
 
 function renderScanAssets() {
   const el = document.getElementById('scan-assets-list');
-  el.innerHTML = scanAssetRows.map((a, i) => `
+  el.innerHTML = scanAssetRows.map((a, i) => {
+    const hl = a._changed ? 'border:1.5px solid var(--orange);' : '';
+    return `
     <div class="form-group" style="flex-wrap:wrap;gap:6px;padding:10px 16px">
       <div style="width:100%;display:flex;gap:6px;align-items:center">
         <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="text" placeholder="종목명" value="${a.name}" oninput="updateScanRow(${i},'name',this.value)">
@@ -740,10 +743,10 @@ function renderScanAssets() {
       <div style="width:100%;display:flex;gap:6px">
         <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="number" placeholder="수량" value="${a.qty}" oninput="updateScanRow(${i},'qty',this.value)">
         <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="number" placeholder="평균단가" value="${a.avgPrice}" oninput="updateScanRow(${i},'avgPrice',this.value)">
-        <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px" type="number" placeholder="현재가" value="${a.price}" oninput="updateScanRow(${i},'price',this.value)">
+        <input class="form-input" style="text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:6px 10px;${hl}" type="number" placeholder="현재가" value="${a.price}" oninput="updateScanRow(${i},'price',this.value)">
       </div>
-    </div>
-  `).join('');
+    </div>`;
+  }).join('');
 }
 
 function updateScanRow(i, field, val) {
@@ -766,13 +769,19 @@ function saveScanRecord() {
     price: parseFloat(a.price) || 0
   }));
   if (!assets.length) { toast('종목을 하나 이상 입력해주세요'); return; }
-  const record = { id: uuid(), date, assets };
-  scanRecords.push(record);
+  // 같은 날짜 기록이 있으면 새로 추가하지 않고 업데이트
+  const existing = scanRecords.find(r => r.date === date);
+  if (existing) {
+    existing.assets = assets;
+    toast('기존 기록이 업데이트되었습니다');
+  } else {
+    scanRecords.push({ id: uuid(), date, assets });
+    toast('기록이 저장되었습니다');
+  }
   save();
   closeModal('scan-modal');
   renderDashboard();
   renderRecords();
-  toast('기록이 저장되었습니다');
 }
 
 function captureScan() {
@@ -782,6 +791,8 @@ function captureScan() {
 function clearScanImage() {
   document.getElementById('scan-img-preview').style.display = 'none';
   document.getElementById('scan-img-el').src = '';
+  document.getElementById('ocr-status').style.display = 'none';
+  document.getElementById('ocr-summary').style.display = 'none';
 }
 
 function processImage(event) {
@@ -789,38 +800,163 @@ function processImage(event) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = e => {
-    // Show preview
-    const imgEl = document.getElementById('scan-img-el');
-    imgEl.src = e.target.result;
+    document.getElementById('scan-img-el').src = e.target.result;
     document.getElementById('scan-img-preview').style.display = 'block';
-
-    // Try TextDetector API (Chrome/Android; not available on iOS Safari)
-    if ('TextDetector' in window) {
-      const img = new Image();
-      img.onload = async () => {
-        try {
-          const detector = new TextDetector();
-          const texts = await detector.detect(img);
-          const numbers = texts
-            .map(t => t.rawValue.replace(/,/g, '').trim())
-            .filter(t => /^\d{3,}(\.\d+)?$/.test(t))
-            .map(Number)
-            .filter(n => n > 0)
-            .sort((a, b) => b - a);
-          if (numbers.length) {
-            toast(`숫자 ${numbers.length}개 인식 — 사진 보며 아래 입력란에 확인해 주세요`);
-          } else {
-            toast('사진을 보며 수치를 직접 입력해 주세요');
-          }
-        } catch { toast('사진을 보며 수치를 직접 입력해 주세요'); }
-      };
-      img.src = e.target.result;
-    } else {
-      toast('사진을 보며 수치를 직접 입력해 주세요');
-    }
+    runOCR(e.target.result);
   };
   reader.readAsDataURL(file);
   event.target.value = '';
+}
+
+// ═══════════════════════════════════════════
+//  OCR (Tesseract.js — iOS Safari 지원)
+// ═══════════════════════════════════════════
+let tesseractLoading = null;
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve();
+  if (!tesseractLoading) {
+    tesseractLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.onload = resolve;
+      s.onerror = () => { tesseractLoading = null; reject(new Error('script load fail')); };
+      document.head.appendChild(s);
+    });
+  }
+  return tesseractLoading;
+}
+
+let ocrWorker = null;
+async function getOcrWorker(statusEl) {
+  if (ocrWorker) return ocrWorker;
+  statusEl.textContent = 'OCR 엔진 로딩 중... (최초 1회, 잠시 걸립니다)';
+  await loadTesseract();
+  ocrWorker = await Tesseract.createWorker('kor+eng', 1, {
+    logger: m => {
+      if (m.status === 'recognizing text') {
+        statusEl.textContent = `텍스트 인식 중... ${Math.round(m.progress * 100)}%`;
+      } else if (m.status === 'loading language traineddata') {
+        statusEl.textContent = `한글 인식 데이터 다운로드 중... ${Math.round((m.progress || 0) * 100)}%`;
+      }
+    }
+  });
+  return ocrWorker;
+}
+
+async function runOCR(dataURL) {
+  const statusEl = document.getElementById('ocr-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '준비 중...';
+  try {
+    const worker = await getOcrWorker(statusEl);
+    const { data } = await worker.recognize(dataURL);
+    const parsed = parseAssetsFromText(data.text);
+    statusEl.style.display = 'none';
+    if (!parsed.length) {
+      toast('종목을 인식하지 못했습니다 — 사진을 보며 직접 입력해 주세요');
+      return;
+    }
+    applyParsedAssets(parsed);
+  } catch (err) {
+    statusEl.style.display = 'none';
+    console.log('OCR 실패:', err);
+    toast('자동 인식 실패 — 사진을 보며 직접 입력해 주세요');
+  }
+}
+
+// OCR 텍스트에서 종목명 + 숫자 블록 추출
+function parseAssetsFromText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  // 증권앱 UI 공통 단어는 종목명에서 제외
+  const uiWords = /^(매수|매도|평가금액|평가손익|손익|수익률|총평가|총매입|매입금액|예수금|잔고|계좌|종목명|현재가|수량|보유수량|평균단가|매입단가|등락|전일대비|원|주|체결|주문|차트|관심|국내|해외|합계|총|자산|투자|금액)$/;
+  const results = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^([가-힣A-Za-z][가-힣A-Za-z0-9&()\.\-\s]*[가-힣A-Za-z0-9)])/);
+    if (!m) continue;
+    const name = m[1].replace(/\s+/g, ' ').trim();
+    if (name.length < 2 || uiWords.test(name)) continue;
+    // 같은 줄 나머지 + 다음 2줄에서 숫자 수집
+    const numText = [lines[i].slice(m[0].length), lines[i + 1] || '', lines[i + 2] || ''].join(' ');
+    const nums = (numText.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g) || [])
+      .map(s => parseFloat(s.replace(/,/g, '')))
+      .filter(n => n > 0);
+    if (!nums.length) continue;
+    // 동일 종목명 중복 시 숫자가 더 많은 쪽 유지
+    const dup = results.find(r => r.name === name);
+    if (dup) { if (nums.length > dup.nums.length) dup.nums = nums; continue; }
+    results.push({ name, nums });
+  }
+  return results;
+}
+
+// 인식 결과를 이전 기록과 병합 — 변경된 부분만 업데이트
+function applyParsedAssets(parsed) {
+  const latest = enrich(sortedRecords())[0];
+  const prevAssets = latest ? latest.assets : [];
+  const norm = s => s.replace(/\s+/g, '').toLowerCase();
+  const rows = [];
+  const changes = [];
+  const matchedPrev = new Set();
+
+  parsed.forEach(p => {
+    const prev = prevAssets.find(a => {
+      const n1 = norm(a.name), n2 = norm(p.name);
+      return n1 === n2 || (n1.length >= 3 && n2.includes(n1)) || (n2.length >= 3 && n1.includes(n2));
+    });
+
+    if (prev) {
+      // 기존 종목: 이전 현재가와 ±35% 이내로 가장 가까운 숫자를 새 현재가로 선택
+      matchedPrev.add(norm(prev.name));
+      let newPrice = prev.price, bestRatio = Infinity;
+      p.nums.forEach(n => {
+        if (n === prev.qty || n === prev.avgPrice) return;
+        const ratio = Math.abs(n - prev.price) / Math.max(prev.price, 1);
+        if (ratio < 0.35 && ratio < bestRatio) { bestRatio = ratio; newPrice = n; }
+      });
+      const priceChanged = newPrice !== prev.price;
+      rows.push({
+        id: uuid(), name: prev.name, symbol: prev.symbol || '',
+        qty: String(prev.qty), avgPrice: String(prev.avgPrice), price: String(newPrice),
+        _changed: priceChanged
+      });
+      changes.push(priceChanged
+        ? `<span style="color:var(--orange)">↻</span> ${prev.name}: ${prev.price.toLocaleString()} → <b>${newPrice.toLocaleString()}원</b>`
+        : `<span style="color:var(--txt3)">=</span> ${prev.name}: 변동 없음`);
+    } else {
+      // 신규 종목: 최대 숫자를 현재가로 추정, 정수 중 최소값을 수량 후보로
+      const sortedNums = [...p.nums].sort((a, b) => b - a);
+      const price = sortedNums[0] || 0;
+      const intCandidates = p.nums.filter(n => Number.isInteger(n) && n < price && n <= 100000);
+      const qty = intCandidates.length ? Math.min(...intCandidates) : 0;
+      rows.push({
+        id: uuid(), name: p.name, symbol: '',
+        qty: qty ? String(qty) : '', avgPrice: '', price: price ? String(price) : '',
+        _changed: true
+      });
+      changes.push(`<span style="color:var(--green)">＋</span> ${p.name}: 신규 (현재가 추정 ${price ? price.toLocaleString() + '원' : '미인식'})`);
+    }
+  });
+
+  // 사진에 없는 기존 종목은 이전 값 그대로 유지
+  prevAssets.forEach(a => {
+    if (!matchedPrev.has(norm(a.name))) {
+      rows.push({
+        id: uuid(), name: a.name, symbol: a.symbol || '',
+        qty: String(a.qty), avgPrice: String(a.avgPrice), price: String(a.price),
+        _changed: false
+      });
+      changes.push(`<span style="color:var(--txt3)">＝</span> ${a.name}: 사진에 없음 — 이전 값 유지`);
+    }
+  });
+
+  scanAssetRows = rows;
+  renderScanAssets();
+
+  const summaryEl = document.getElementById('ocr-summary');
+  summaryEl.innerHTML = `<div style="font-weight:600;margin-bottom:4px;font-size:13px">자동 인식 결과 — 확인 후 저장하세요</div>${changes.join('<br>')}`;
+  summaryEl.style.display = 'block';
+  toast(`${parsed.length}개 종목 인식 완료`);
 }
 
 // ═══════════════════════════════════════════
