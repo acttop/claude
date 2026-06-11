@@ -864,10 +864,75 @@ async function runOCR(dataURL) {
   }
 }
 
-// OCR 텍스트에서 종목명 + 숫자 블록 추출
+// OCR 텍스트 파싱 — 라벨 구조(연금계좌현황 등) 우선, 실패 시 일반 휴리스틱
 function parseAssetsFromText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-  // 증권앱 UI 공통 단어는 종목명에서 제외
+  const structured = parseStructuredBlocks(lines);
+  if (structured.length) return structured;
+  return parseGenericBlocks(lines);
+}
+
+function ocrNum(s) {
+  const m = s.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0].replace(/,/g, '')) : null;
+}
+
+// 증권앱 라벨 구조 파싱:
+//   종목명
+//   매입금액            7,966,500원
+//   보유수량/매입단가    500주 / 15,933원
+//   평가금액            6,775,000원
+function parseStructuredBlocks(lines) {
+  const results = [];
+  const labelRe = /매입\s*금액|보유\s*수량|매입\s*단가|평가\s*금액|평가\s*손익|수익률/;
+  const noiseRe = /^(매수|매도|ETF|금융상품|디폴트|연금계좌|관심종목|투자NOW|MY자산|메뉴|홈|국내|해외|예수금|체결|주문|차트|리츠)/;
+
+  for (let i = 0; i < lines.length; i++) {
+    const raw = lines[i].replace(/[<>›〉‹]/g, ' ').trim();
+    if (!raw || labelRe.test(raw) || noiseRe.test(raw)) continue;
+    const nm = raw.match(/^([A-Za-z가-힣][A-Za-z가-힣0-9&()\.\-\/\s]*[A-Za-z가-힣0-9)])/);
+    if (!nm) continue;
+    const name = nm[1].replace(/\s+/g, ' ').trim();
+    if (name.length < 3 || /^\d+$/.test(name)) continue;
+
+    // 종목명 다음 ~8줄 내에서 라벨 필드 수집
+    let investment = null, qty = null, avgPrice = null, value = null;
+    let consumed = i;
+    for (let j = i + 1; j < Math.min(i + 9, lines.length); j++) {
+      const l = lines[j];
+      if (investment === null && /매입\s*금액/.test(l)) {
+        investment = ocrNum(l.replace(/매입\s*금액/, ''));
+      }
+      if (qty === null) {
+        // "500주 / 15,933원" — 구분자(/, |)와 공백 OCR 오차 허용
+        const qm = l.match(/(\d{1,3}(?:,\d{3})*)\s*주\s*[\/|]?\s*(\d{1,3}(?:,\d{3})*)\s*원?/);
+        if (qm) {
+          qty = parseFloat(qm[1].replace(/,/g, ''));
+          avgPrice = parseFloat(qm[2].replace(/,/g, ''));
+        }
+      }
+      if (value === null && /평가\s*금액/.test(l)) {
+        value = ocrNum(l.replace(/평가\s*금액/, ''));
+        consumed = j;
+        break; // 평가금액이 블록의 마지막 필드
+      }
+    }
+
+    if (qty > 0 && value > 0) {
+      const price = Math.round(value / qty); // 현재가 = 평가금액 ÷ 수량
+      // 매입금액으로 평균단가 교차 검증 — 5% 이상 어긋나면 매입금액 기준 보정
+      if (investment && (!avgPrice || Math.abs(qty * avgPrice - investment) / investment > 0.05)) {
+        avgPrice = Math.round(investment / qty);
+      }
+      results.push({ name, qty, avgPrice: avgPrice || 0, price, structured: true });
+      i = consumed;
+    }
+  }
+  return results;
+}
+
+// 일반 휴리스틱: 종목명 + 주변 숫자 수집 (라벨 구조가 아닌 화면용)
+function parseGenericBlocks(lines) {
   const uiWords = /^(매수|매도|평가금액|평가손익|손익|수익률|총평가|총매입|매입금액|예수금|잔고|계좌|종목명|현재가|수량|보유수량|평균단가|매입단가|등락|전일대비|원|주|체결|주문|차트|관심|국내|해외|합계|총|자산|투자|금액)$/;
   const results = [];
 
@@ -876,16 +941,14 @@ function parseAssetsFromText(text) {
     if (!m) continue;
     const name = m[1].replace(/\s+/g, ' ').trim();
     if (name.length < 2 || uiWords.test(name)) continue;
-    // 같은 줄 나머지 + 다음 2줄에서 숫자 수집
     const numText = [lines[i].slice(m[0].length), lines[i + 1] || '', lines[i + 2] || ''].join(' ');
     const nums = (numText.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g) || [])
       .map(s => parseFloat(s.replace(/,/g, '')))
       .filter(n => n > 0);
     if (!nums.length) continue;
-    // 동일 종목명 중복 시 숫자가 더 많은 쪽 유지
     const dup = results.find(r => r.name === name);
     if (dup) { if (nums.length > dup.nums.length) dup.nums = nums; continue; }
-    results.push({ name, nums });
+    results.push({ name, nums, structured: false });
   }
   return results;
 }
@@ -905,8 +968,39 @@ function applyParsedAssets(parsed) {
       return n1 === n2 || (n1.length >= 3 && n2.includes(n1)) || (n2.length >= 3 && n1.includes(n2));
     });
 
-    if (prev) {
-      // 기존 종목: 이전 현재가와 ±35% 이내로 가장 가까운 숫자를 새 현재가로 선택
+    if (p.structured) {
+      // 라벨 구조 인식: 수량/평단/현재가를 정확히 추출한 경우 그대로 사용
+      if (prev) {
+        matchedPrev.add(norm(prev.name));
+        const priceChanged = p.price !== prev.price;
+        const qtyChanged = p.qty !== prev.qty;
+        const avgChanged = p.avgPrice > 0 && p.avgPrice !== prev.avgPrice;
+        rows.push({
+          id: uuid(), name: prev.name, symbol: prev.symbol || '',
+          qty: String(p.qty),
+          avgPrice: String(p.avgPrice > 0 ? p.avgPrice : prev.avgPrice),
+          price: String(p.price),
+          _changed: priceChanged || qtyChanged || avgChanged
+        });
+        if (priceChanged || qtyChanged || avgChanged) {
+          const parts = [];
+          if (priceChanged) parts.push(`${prev.price.toLocaleString()} → <b>${p.price.toLocaleString()}원</b>`);
+          if (qtyChanged) parts.push(`${prev.qty}주 → <b>${p.qty}주</b>`);
+          if (avgChanged) parts.push(`평단 ${p.avgPrice.toLocaleString()}원`);
+          changes.push(`<span style="color:var(--orange)">↻</span> ${prev.name}: ${parts.join(' · ')}`);
+        } else {
+          changes.push(`<span style="color:var(--txt3)">=</span> ${prev.name}: 변동 없음`);
+        }
+      } else {
+        rows.push({
+          id: uuid(), name: p.name, symbol: '',
+          qty: String(p.qty), avgPrice: String(p.avgPrice), price: String(p.price),
+          _changed: true
+        });
+        changes.push(`<span style="color:var(--green)">＋</span> ${p.name}: 신규 ${p.qty}주 · 현재가 ${p.price.toLocaleString()}원`);
+      }
+    } else if (prev) {
+      // 일반 휴리스틱 + 기존 종목: 이전 현재가 ±35% 이내 가장 가까운 숫자를 새 현재가로
       matchedPrev.add(norm(prev.name));
       let newPrice = prev.price, bestRatio = Infinity;
       p.nums.forEach(n => {
@@ -924,7 +1018,7 @@ function applyParsedAssets(parsed) {
         ? `<span style="color:var(--orange)">↻</span> ${prev.name}: ${prev.price.toLocaleString()} → <b>${newPrice.toLocaleString()}원</b>`
         : `<span style="color:var(--txt3)">=</span> ${prev.name}: 변동 없음`);
     } else {
-      // 신규 종목: 최대 숫자를 현재가로 추정, 정수 중 최소값을 수량 후보로
+      // 일반 휴리스틱 + 신규 종목: 최대 숫자를 현재가로 추정
       const sortedNums = [...p.nums].sort((a, b) => b - a);
       const price = sortedNums[0] || 0;
       const intCandidates = p.nums.filter(n => Number.isInteger(n) && n < price && n <= 100000);
