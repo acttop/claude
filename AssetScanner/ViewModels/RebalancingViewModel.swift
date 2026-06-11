@@ -1,5 +1,6 @@
 import Foundation
 import Combine
+import WidgetKit
 
 class RebalancingViewModel: ObservableObject {
     @Published var portfolio: Portfolio = Portfolio()
@@ -18,9 +19,17 @@ class RebalancingViewModel: ObservableObject {
         portfolio = persistence.loadPortfolio() ?? Portfolio()
         if portfolio.assets.isEmpty { loadSamplePortfolio() }
 
-        // ExchangeRateService 변경을 이 ViewModel 변경으로 전파
+        // ExchangeRateService 변경을 ViewModel + Widget에 전파
         rateService.objectWillChange
-            .sink { [weak self] _ in self?.objectWillChange.send() }
+            .sink { [weak self] _ in
+                self?.objectWillChange.send()
+            }
+            .store(in: &cancellables)
+
+        // 환율 갱신 후 위젯 동기화 (debounce로 연속 호출 방지)
+        rateService.objectWillChange
+            .debounce(for: .seconds(1), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.syncWidgetData() }
             .store(in: &cancellables)
 
         Task { await rateService.fetchRate() }
@@ -66,7 +75,23 @@ class RebalancingViewModel: ObservableObject {
     }
 
     // MARK: - Persistence
-    private func save() { persistence.savePortfolio(portfolio) }
+    private func save() {
+        persistence.savePortfolio(portfolio)
+        syncWidgetData()
+    }
+
+    // MARK: - Widget 동기화
+    private func syncWidgetData() {
+        let data = PortfolioWidgetData(
+            usdKrw: rateService.snapshot?.rate ?? 0,
+            needsRebalancing: needsRebalancing,
+            maxDeviation: maxDeviation,
+            portfolioName: portfolio.name,
+            updatedAt: Date()
+        )
+        WidgetDataStore.savePortfolioData(data)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
 
     // MARK: - 샘플 포트폴리오 (연금/ETF)
     private func loadSamplePortfolio() {

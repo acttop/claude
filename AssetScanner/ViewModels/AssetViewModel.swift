@@ -1,5 +1,6 @@
 import Foundation
 import SwiftUI
+import WidgetKit
 
 struct PnLDataPoint: Identifiable {
     let id = UUID()
@@ -90,8 +91,31 @@ class AssetViewModel: ObservableObject {
         save()
     }
 
-    private func save() { persistence.saveRecords(scanRecords) }
+    private func save() {
+        persistence.saveRecords(scanRecords)
+        syncWidgetData()
+    }
+
     private func loadRecords() { scanRecords = persistence.loadRecords() }
+
+    // MARK: - Widget 동기화
+    private func syncWidgetData() {
+        let holdings = (latestRecord?.assets.prefix(3) ?? []).map {
+            AssetWidgetData.HoldingItem(name: $0.name, value: $0.currentValue, pnlPercent: $0.pnlPercent)
+        }
+        let data = AssetWidgetData(
+            totalValue: totalValue,
+            totalInvestment: totalInvestment,
+            dailyPnL: latestDailyPnL,
+            dailyPnLPercent: latestDailyPnLPercent,
+            cumulativePnL: cumulativePnL,
+            cumulativePnLPercent: cumulativePnLPercent,
+            topHoldings: Array(holdings),
+            updatedAt: Date()
+        )
+        WidgetDataStore.saveAssetData(data)
+        WidgetCenter.shared.reloadAllTimelines()
+    }
 
     // MARK: - 샘플 데이터
     private func addSampleData() {

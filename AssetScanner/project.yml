@@ -12,6 +12,7 @@ configs:
   Release: release
 
 targets:
+  # ─── 메인 앱 ───────────────────────────────────────────────────────────────
   AssetScanner:
     type: application
     platform: iOS
@@ -21,6 +22,7 @@ targets:
         excludes:
           - project.yml
           - "*.md"
+          - AssetScannerWidget/**   # 위젯 소스는 별도 타겟
     info:
       path: Resources/Info.plist
       properties:
@@ -36,7 +38,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.assetscanner.app
         SWIFT_VERSION: "5.9"
-        DEVELOPMENT_TEAM: ""
+        DEVELOPMENT_TEAM: ""          # ← Apple 개발자 팀 ID 입력
         TARGETED_DEVICE_FAMILY: "1"
         MARKETING_VERSION: "1.0"
         CURRENT_PROJECT_VERSION: "1"
@@ -48,3 +50,38 @@ targets:
         Release:
           DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
           SWIFT_OPTIMIZATION_LEVEL: "-O"
+    entitlements:
+      path: Resources/AssetScanner.entitlements
+    dependencies:
+      - target: AssetScannerWidget  # 위젯 익스텐션 내장
+
+  # ─── 위젯 익스텐션 ──────────────────────────────────────────────────────────
+  AssetScannerWidget:
+    type: app-extension
+    platform: iOS
+    deploymentTarget: "16.0"
+    sources:
+      - path: AssetScannerWidget   # 위젯 전용 소스
+      - path: Shared               # 앱과 공유 모델 (WidgetModels, WidgetDataStore)
+    info:
+      path: AssetScannerWidget/Info.plist
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.assetscanner.app.widget
+        SWIFT_VERSION: "5.9"
+        DEVELOPMENT_TEAM: ""          # ← 메인 앱과 동일한 팀 ID
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        APPLICATION_EXTENSION_API_ONLY: YES
+        SKIP_INSTALL: YES
+        GENERATE_INFOPLIST_FILE: NO
+      configs:
+        Debug:
+          DEBUG_INFORMATION_FORMAT: dwarf
+          SWIFT_ACTIVE_COMPILATION_CONDITIONS: DEBUG
+        Release:
+          DEBUG_INFORMATION_FORMAT: dwarf-with-dsym
+          SWIFT_OPTIMIZATION_LEVEL: "-O"
+    entitlements:
+      path: AssetScannerWidget/AssetScannerWidget.entitlements
