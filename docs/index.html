@@ -320,6 +320,9 @@
     <div class="modal-title" id="detail-title"></div>
     <div id="detail-content"></div>
     <div class="btn-wrap">
+      <button class="btn btn-primary" id="detail-edit-btn">수정</button>
+    </div>
+    <div class="btn-wrap" style="padding-top:0">
       <button class="btn btn-danger" id="detail-delete-btn">삭제</button>
     </div>
     <div class="btn-wrap" style="padding-top:0">
@@ -427,6 +430,7 @@ let settings    = LS.get('settings', { alertEnabled: false, alertThreshold: 1300
 let usdKrw      = 0;
 let usdKrwTime  = null;
 let editingAssetId = null;
+let editingRecordId = null;
 
 function save() {
   LS.set('scanRecords', scanRecords);
@@ -684,6 +688,7 @@ function openDetail(id) {
   const dPct = dailyPct > 0 ? (d / dailyPct) * 100 : 0;
 
   document.getElementById('detail-title').textContent = fmtDate(r.date);
+  document.getElementById('detail-edit-btn').onclick = () => openEditRecord(id);
   document.getElementById('detail-delete-btn').onclick = () => {
     if (confirm('이 기록을 삭제하시겠습니까?')) {
       scanRecords = scanRecords.filter(x => x.id !== id);
@@ -735,6 +740,26 @@ function openScanModal() {
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('scan-date').value = today;
   scanAssetRows = [emptyScanRow()];
+  editingRecordId = null;
+  document.querySelector('#scan-modal .modal-title').textContent = '자산 기록 추가';
+  renderScanAssets();
+  clearScanImage();
+  openModal('scan-modal');
+}
+
+function openEditRecord(id) {
+  const r = scanRecords.find(x => x.id === id);
+  if (!r) return;
+  closeModal('detail-modal');
+  document.getElementById('scan-date').value = r.date;
+  scanAssetRows = (r.assets || []).map(a => ({
+    id: uuid(), name: a.name,
+    buyAmount: String(a.buyAmount || ''), qty: String(a.qty || ''),
+    avgPrice: String(a.avgPrice || ''), evalAmount: String(a.evalAmount || ''),
+    _changed: false
+  }));
+  editingRecordId = id;
+  document.querySelector('#scan-modal .modal-title').textContent = '자산 기록 수정';
   renderScanAssets();
   clearScanImage();
   openModal('scan-modal');
@@ -810,14 +835,25 @@ function saveScanRecord() {
     };
   });
   if (!assets.length) { toast('종목을 하나 이상 입력해주세요'); return; }
-  // 같은 날짜 기록이 있으면 새로 추가하지 않고 업데이트
-  const existing = scanRecords.find(r => r.date === date);
-  if (existing) {
-    existing.assets = assets;
-    toast('기존 기록이 업데이트되었습니다');
+
+  if (editingRecordId) {
+    // 수정 모드: 특정 기록 업데이트
+    const idx = scanRecords.findIndex(r => r.id === editingRecordId);
+    if (idx >= 0) {
+      scanRecords[idx] = { ...scanRecords[idx], date, assets };
+      toast('기록이 수정되었습니다');
+    }
+    editingRecordId = null;
   } else {
-    scanRecords.push({ id: uuid(), date, assets });
-    toast('기록이 저장되었습니다');
+    // 같은 날짜 기록이 있으면 새로 추가하지 않고 업데이트
+    const existing = scanRecords.find(r => r.date === date);
+    if (existing) {
+      existing.assets = assets;
+      toast('기존 기록이 업데이트되었습니다');
+    } else {
+      scanRecords.push({ id: uuid(), date, assets });
+      toast('기록이 저장되었습니다');
+    }
   }
   save();
   closeModal('scan-modal');
