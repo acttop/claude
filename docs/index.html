@@ -317,16 +317,14 @@
 <div class="modal-overlay" id="detail-modal">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="detail-title"></div>
+    <div style="display:flex;align-items:center;padding:0 20px 16px;gap:8px">
+      <div id="detail-title" style="font-size:17px;font-weight:700;flex:1"></div>
+      <button id="detail-edit-btn" style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:6px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">수정</button>
+    </div>
     <div id="detail-content"></div>
-    <div class="btn-wrap">
-      <button class="btn btn-primary" id="detail-edit-btn">수정</button>
-    </div>
-    <div class="btn-wrap" style="padding-top:0">
-      <button class="btn btn-danger" id="detail-delete-btn">삭제</button>
-    </div>
-    <div class="btn-wrap" style="padding-top:0">
-      <button class="btn btn-secondary" onclick="closeModal('detail-modal')">닫기</button>
+    <div class="btn-wrap" style="display:flex;gap:8px">
+      <button class="btn btn-danger" id="detail-delete-btn" style="flex:1">삭제</button>
+      <button class="btn btn-secondary" onclick="closeModal('detail-modal')" style="flex:1">닫기</button>
     </div>
   </div>
 </div>
@@ -762,7 +760,8 @@ function openEditRecord(id) {
   document.querySelector('#scan-modal .modal-title').textContent = '자산 기록 수정';
   renderScanAssets();
   clearScanImage();
-  openModal('scan-modal');
+  // iOS Safari: 모달 전환 시 짧은 딜레이 필요
+  setTimeout(() => openModal('scan-modal'), 80);
 }
 
 function addScanAssetRow() {
