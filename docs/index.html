@@ -1119,7 +1119,7 @@ function parseGenericBlocks(lines) {
   const results = [];
 
   for (let i = 0; i < lines.length; i++) {
-    const m = lines[i].match(/^([가-힣A-Za-z][가-힣A-Za-z0-9&()\.\-\s]*[가-힣A-Za-z0-9)])/);
+    const m = lines[i].match(/^([가-힣A-Za-z][가-힣A-Za-z0-9&(). \-\s]*[가-힣A-Za-z0-9])/);
     if (!m) continue;
     const name = m[1].replace(/\s+/g, ' ').trim();
     if (name.length < 2 || uiWords.test(name)) continue;
