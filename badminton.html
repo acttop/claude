@@ -2,10 +2,17 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
   <title>배드민턴 복식 로테이션 시뮬레이터</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
     :root {
       --bg: #0a0f1e;
       --surface: #111827;
@@ -25,10 +32,16 @@
       color: var(--text);
       font-family: 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
       min-height: 100vh;
+      min-height: 100dvh;
       display: flex;
       justify-content: center;
       align-items: flex-start;
-      padding: 16px max(16px, env(safe-area-inset-left));
+      padding: max(16px, env(safe-area-inset-top))
+               max(16px, env(safe-area-inset-right))
+               max(24px, env(safe-area-inset-bottom))
+               max(16px, env(safe-area-inset-left));
+      -webkit-overflow-scrolling: touch;
+      overflow-x: hidden;
     }
     .app { width: 100%; max-width: 480px; }
 
@@ -116,9 +129,12 @@
       border-radius: var(--radius); padding: 10px;
       cursor: pointer; transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
       display: flex; flex-direction: column; align-items: center; gap: 8px;
+      user-select: none; -webkit-user-select: none;
     }
-    .option-card:hover { border-color: #4b5563; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
-    .option-card:active { transform: scale(0.98); }
+    @media (hover: hover) {
+      .option-card:hover { border-color: #4b5563; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+    }
+    .option-card:active { transform: scale(0.96); background: #1e293b; }
     .option-card.selected-correct { border-color: var(--green); background: #052e16; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
     .option-card.selected-wrong { border-color: var(--red); background: #1c0a0a; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
     .option-card.show-correct { border-color: var(--green); background: #052e16; }
@@ -620,14 +636,25 @@ function drawShuttleTrajectory(ctx, scenario, cw, ch, pad) {
 
 function renderMainCourt(scenario, playerOverride = null, phase = 'initial') {
   const canvas = document.getElementById('main-court');
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const wrap = canvas.parentElement;
+  const logW = Math.max(280, wrap.clientWidth - 16);
+  const logH = Math.round(logW * 560 / 440);
+
+  canvas.width = Math.round(logW * dpr);
+  canvas.height = Math.round(logH * dpr);
+  canvas.style.width = logW + 'px';
+  canvas.style.height = logH + 'px';
+
   const ctx = canvas.getContext('2d');
-  const cw = canvas.width, ch = canvas.height;
-  const pad = 24;
-  const pr = 22;
+  ctx.scale(dpr, dpr);
+  const cw = logW, ch = logH;
+  const pad = Math.max(18, Math.round(logW * 0.055));
+  const pr = Math.max(16, Math.round(logW * 0.05));
 
   drawCourt(ctx, cw, ch, pad);
   drawShuttleTrajectory(ctx, scenario, cw, ch, pad);
-  drawShuttle(ctx, scenario.shuttle.tx, scenario.shuttle.ty, cw, ch, pad, 10);
+  drawShuttle(ctx, scenario.shuttle.tx, scenario.shuttle.ty, cw, ch, pad, Math.round(pr * 0.45));
 
   const players = playerOverride || scenario.players;
   players.forEach(p => {
@@ -635,7 +662,6 @@ function renderMainCourt(scenario, playerOverride = null, phase = 'initial') {
       playerColor(p.id), cw, ch, pad, pr);
   });
 
-  // Movement arrows when showing result
   if (phase === 'result' && playerOverride) {
     scenario.players.forEach(init => {
       const fin = playerOverride.find(p => p.id === init.id);
@@ -654,17 +680,20 @@ function renderMainCourt(scenario, playerOverride = null, phase = 'initial') {
 // ─────────────────────────────────────────────
 function createMiniCanvas(scenario, optionPlayers) {
   const canvas = document.createElement('canvas');
-  const CW = 200, CH = 180;
-  canvas.width = CW; canvas.height = CH;
+  const logW = 200, logH = 180;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width = Math.round(logW * dpr);
+  canvas.height = Math.round(logH * dpr);
   canvas.className = 'option-mini-canvas';
 
   const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const CW = logW, CH = logH;
   const pad = 12, pr = 12;
 
   drawCourt(ctx, CW, CH, pad);
   drawShuttle(ctx, scenario.shuttle.tx, scenario.shuttle.ty, CW, CH, pad, 6);
 
-  // Show movement arrows from initial to option positions
   scenario.players.forEach(init => {
     const fin = optionPlayers.find(p => p.id === init.id);
     if (!fin) return;
@@ -675,7 +704,6 @@ function createMiniCanvas(scenario, optionPlayers) {
     }
   });
 
-  // Draw players at final positions
   optionPlayers.forEach(p => {
     drawPlayer(ctx, p.x, p.y, p.id === 'p1' ? 'P1' : 'P2', playerColor(p.id), CW, CH, pad, pr);
   });
@@ -831,6 +859,31 @@ function showScreen(id) {
   document.getElementById(id).classList.add('active');
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
+
+// Re-render on iPad orientation change or window resize
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    if (document.getElementById('quiz-screen').classList.contains('active') && !answered) {
+      renderMainCourt(SCENARIOS[currentIdx]);
+    } else if (document.getElementById('quiz-screen').classList.contains('active') && answered) {
+      const s = SCENARIOS[currentIdx];
+      const correctOpt = s.options.find(o => o.correct);
+      renderMainCourt(s, correctOpt.players.map((p, i) => ({
+        ...p, label: s.players[i]?.label || (p.id === 'p1' ? 'P1' : 'P2')
+      })), 'result');
+    }
+  }, 200);
+});
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    if (document.getElementById('quiz-screen').classList.contains('active')) {
+      renderMainCourt(SCENARIOS[currentIdx]);
+    }
+  }, 350);
+});
 </script>
 </body>
 </html>
