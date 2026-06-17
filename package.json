@@ -1,0 +1,52 @@
+{
+  "name": "badminton-strategy-board",
+  "version": "1.0.0",
+  "description": "배드민턴 복식 전략보드",
+  "author": {
+    "name": "Badminton Strategy",
+    "email": "acttop@poscodx.com"
+  },
+  "homepage": "https://github.com/acttop/claude",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build:linux": "electron-builder --linux",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.badminton.strategyboard",
+    "productName": "배드민턴 전략보드",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "index.html",
+      "main.js",
+      "icons/**"
+    ],
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "icons/icon.svg",
+      "category": "Sports"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "icons/icon-512.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "icon": "icons/icon-512.png"
+    },
+    "nsis": {
+      "oneClick": true,
+      "installerLanguages": ["ko_KR"],
+      "language": "1042"
+    }
+  },
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  }
+}

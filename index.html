@@ -1,84 +1,976 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>사다리 게임</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="배드민턴전략">
+  <title>배드민턴 복식 전략보드</title>
+  <style>
+    * {
+      margin: 0; padding: 0; box-sizing: border-box;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+    }
 
-  <!-- PWA -->
-  <link rel="manifest" href="manifest.json" />
-  <meta name="theme-color" content="#e94560" />
+    html, body {
+      width: 100%; height: 100%;
+      background: #1a1a2e;
+      color: #e0e0e0;
+      font-family: -apple-system, 'Helvetica Neue', sans-serif;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      /* Prevent Safari bounce scroll */
+      position: fixed;
+      top: 0; left: 0;
+    }
 
-  <!-- iOS Safari -->
-  <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <meta name="apple-mobile-web-app-title" content="사다리" />
-  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+    /* ── Header ─────────────────────────── */
+    #header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      padding-top: max(8px, env(safe-area-inset-top));
+      background: #16213e;
+      border-bottom: 2px solid #0f3460;
+      flex-shrink: 0;
+      gap: 8px;
+    }
 
-  <link rel="stylesheet" href="style.css" />
+    #header h1 {
+      font-size: 1rem;
+      color: #e94560;
+      font-weight: 700;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    #toolbar {
+      display: flex;
+      gap: 5px;
+      align-items: center;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      flex: 1;
+      padding-bottom: 2px;
+    }
+
+    #toolbar::-webkit-scrollbar { display: none; }
+
+    .tool-group {
+      display: flex;
+      gap: 3px;
+      align-items: center;
+      background: #0f3460;
+      padding: 4px 8px;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .tool-group label {
+      font-size: 0.65rem;
+      color: #a0a0c0;
+      margin-right: 2px;
+      white-space: nowrap;
+    }
+
+    button {
+      background: #0f3460;
+      color: #e0e0e0;
+      border: 1px solid #1a5276;
+      border-radius: 8px;
+      padding: 7px 11px;
+      cursor: pointer;
+      font-size: 0.78rem;
+      transition: background 0.12s;
+      white-space: nowrap;
+      /* iOS: prevent highlight flash */
+      -webkit-tap-highlight-color: transparent;
+      min-height: 36px;
+    }
+
+    button:active { background: #1a5276; }
+    button.active { background: #e94560; border-color: #e94560; color: #fff; }
+
+    .color-btn {
+      width: 26px; height: 26px;
+      border-radius: 50%;
+      border: 3px solid transparent;
+      cursor: pointer; padding: 0;
+      flex-shrink: 0;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .color-btn.active { border-color: #fff; transform: scale(1.2); }
+
+    /* ── Main ───────────────────────────── */
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+      min-height: 0;
+    }
+
+    #court-container {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8px;
+      overflow: hidden;
+      background: #111827;
+      min-width: 0;
+    }
+
+    canvas {
+      border-radius: 6px;
+      display: block;
+      box-shadow: 0 0 30px rgba(0,0,0,0.6);
+      /* Prevent browser handling touch on canvas */
+      touch-action: none;
+    }
+
+    /* ── Sidebar ────────────────────────── */
+    #sidebar {
+      width: 200px;
+      min-width: 200px;
+      background: #16213e;
+      border-left: 2px solid #0f3460;
+      display: flex;
+      flex-direction: column;
+      padding: 8px;
+      gap: 7px;
+      flex-shrink: 0;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding-bottom: max(8px, env(safe-area-inset-bottom));
+    }
+
+    #sidebar::-webkit-scrollbar { width: 3px; }
+    #sidebar::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+
+    .sidebar-section {
+      background: #0f3460;
+      border-radius: 8px;
+      padding: 8px;
+      flex-shrink: 0;
+    }
+
+    .sidebar-section h3 {
+      font-size: 0.68rem;
+      color: #e94560;
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    /* ── Player tokens ──────────────────── */
+    .player-token {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 7px 8px;
+      border-radius: 8px;
+      margin-bottom: 4px;
+      background: #1a4a7a;
+      border: 1px solid #2a6aaa;
+      cursor: pointer;
+      transition: background 0.1s, transform 0.1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .player-token.selected {
+      background: #1e6eb0;
+      border-color: #4db8ff;
+      transform: scale(1.02);
+    }
+
+    .player-token:active { background: #1e5a8a; }
+
+    .token-circle {
+      width: 30px; height: 30px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      font-size: 0.8rem;
+      flex-shrink: 0;
+      border: 2px solid rgba(255,255,255,0.4);
+    }
+
+    .token-label { font-size: 0.72rem; flex: 1; }
+    .token-hint  { font-size: 0.6rem; color: #6090b0; margin-top: 1px; }
+
+    #place-hint {
+      background: rgba(78,205,196,0.15);
+      border: 1px solid #4ecdc4;
+      border-radius: 6px;
+      padding: 5px 7px;
+      font-size: 0.68rem;
+      color: #4ecdc4;
+      text-align: center;
+      display: none;
+    }
+
+    /* ── Score ──────────────────────────── */
+    .score-row { display: flex; justify-content: space-around; align-items: center; }
+    .score-team { text-align: center; }
+    .score-team .team-name { font-size: 0.62rem; color: #a0b0c0; margin-bottom: 2px; }
+    .score-team .score-num { font-size: 1.6rem; font-weight: bold; }
+    .score-team .score-num.team-a { color: #e94560; }
+    .score-team .score-num.team-b { color: #00d4ff; }
+
+    .score-controls { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }
+    .score-controls button { padding: 4px 10px; font-size: 0.72rem; min-height: 32px; }
+
+    #shuttle-indicator {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      margin: 0 auto;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1rem;
+      cursor: pointer;
+      border: 2px solid #e94560;
+      transition: border-color 0.2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    .sep { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
+
+    #formation-btns { display: flex; flex-direction: column; gap: 4px; }
+    #formation-btns button { width: 100%; text-align: left; font-size: 0.72rem; padding: 7px 8px; }
+
+    .strategy-notes {
+      width: 100%;
+      background: #1a2a4a;
+      border: 1px solid #2a4a7a;
+      color: #e0e0e0;
+      border-radius: 6px;
+      padding: 7px;
+      font-size: 0.75rem;
+      resize: none;
+      height: 70px;
+      -webkit-user-select: text;
+      user-select: text;
+    }
+
+    .legend { display: flex; flex-direction: column; gap: 4px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.67rem; color: #a0b0c0; }
+    .legend-color { width: 20px; height: 3px; border-radius: 2px; }
+
+    /* ── Touch ghost (sidebar drag) ─────── */
+    #drag-ghost {
+      position: fixed;
+      pointer-events: none;
+      z-index: 9999;
+      width: 44px; height: 44px;
+      border-radius: 50%;
+      border: 3px solid #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: bold; font-size: 0.85rem;
+      transform: translate(-50%, -50%);
+      opacity: 0.88;
+      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
+      display: none;
+    }
+  </style>
 </head>
 <body>
-  <div class="app">
-    <header>
-      <h1>🪜 사다리 게임</h1>
-    </header>
 
-    <!-- Setup Screen -->
-    <div id="setup-screen" class="screen active">
-      <div class="setup-container">
-        <div class="setup-section">
-          <h2>참가자</h2>
-          <div id="players-list" class="name-list"></div>
-          <div class="add-row">
-            <input type="text" id="player-input" placeholder="이름 입력" maxlength="10" />
-            <button onclick="addPlayer()">추가</button>
-          </div>
-        </div>
-
-        <div class="setup-section">
-          <h2>결과</h2>
-          <div id="results-list" class="name-list"></div>
-          <div class="add-row">
-            <input type="text" id="result-input" placeholder="결과 입력" maxlength="10" />
-            <button onclick="addResult()">추가</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="setup-actions">
-        <button class="btn-primary" onclick="startGame()">게임 시작</button>
-        <button class="btn-secondary" onclick="loadSample()">샘플 불러오기</button>
-      </div>
-      <div id="setup-error" class="error-msg"></div>
+<div id="header">
+  <h1>🏸 배드민턴 전략보드</h1>
+  <div id="toolbar">
+    <div class="tool-group">
+      <label>도구</label>
+      <button id="btn-move"   class="active" onclick="setTool('move')">✋ 이동</button>
+      <button id="btn-arrow"  onclick="setTool('arrow')">➡ 화살표</button>
+      <button id="btn-draw"   onclick="setTool('draw')">✏ 자유선</button>
+      <button id="btn-shuttle"onclick="setTool('shuttle')">🏸 셔틀</button>
+      <button id="btn-erase"  onclick="setTool('erase')">🗑 지우개</button>
     </div>
-
-    <!-- Game Screen -->
-    <div id="game-screen" class="screen">
-      <div class="game-top-bar">
-        <button class="btn-back" onclick="backToSetup()">← 다시 설정</button>
-        <div class="game-actions">
-          <button class="btn-secondary" onclick="revealAll()">전체 결과 보기</button>
-          <button class="btn-primary" onclick="resetGame()">다시 섞기</button>
-        </div>
-      </div>
-
-      <div class="ladder-wrapper">
-        <div id="player-names" class="name-row top-names"></div>
-        <div class="canvas-container">
-          <canvas id="ladder-canvas"></canvas>
-        </div>
-        <div id="result-names" class="name-row bottom-names"></div>
-      </div>
-
-      <div id="result-panel" class="result-panel"></div>
+    <div class="tool-group">
+      <label>색상</label>
+      <button class="color-btn active" style="background:#ffdd57" onclick="setColor('#ffdd57')"></button>
+      <button class="color-btn" style="background:#ff6b6b" onclick="setColor('#ff6b6b')"></button>
+      <button class="color-btn" style="background:#4ecdc4" onclick="setColor('#4ecdc4')"></button>
+      <button class="color-btn" style="background:#a29bfe" onclick="setColor('#a29bfe')"></button>
+      <button class="color-btn" style="background:#ffffff" onclick="setColor('#ffffff')"></button>
     </div>
+    <div class="tool-group">
+      <label>굵기</label>
+      <button id="w2" onclick="setWidth(2)">얇</button>
+      <button id="w4" class="active" onclick="setWidth(4)">중</button>
+      <button id="w7" onclick="setWidth(7)">굵</button>
+    </div>
+    <button onclick="undoLast()" style="background:#2c3e50">↩ 되돌리기</button>
+    <button onclick="clearDrawings()" style="background:#922b21">🗑 전체삭제</button>
+    <button onclick="resetPlayers()" style="background:#1e8449">🔄 초기화</button>
+  </div>
+</div>
+
+<div id="main">
+  <div id="court-container">
+    <canvas id="court"></canvas>
   </div>
 
-  <script src="game.js"></script>
-  <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('sw.js');
+  <div id="sidebar">
+
+    <div class="sidebar-section">
+      <h3>점수판</h3>
+      <div class="score-row">
+        <div class="score-team">
+          <div class="team-name">팀 A</div>
+          <div class="score-num team-a" id="score-a">0</div>
+          <div class="score-controls">
+            <button onclick="addScore('a',1)">+1</button>
+            <button onclick="addScore('a',-1)">-1</button>
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div id="shuttle-indicator" onclick="toggleServe()">🏸</div>
+          <div style="font-size:0.58rem;color:#a0b0c0;margin-top:2px">서브</div>
+        </div>
+        <div class="score-team">
+          <div class="team-name">팀 B</div>
+          <div class="score-num team-b" id="score-b">0</div>
+          <div class="score-controls">
+            <button onclick="addScore('b',1)">+1</button>
+            <button onclick="addScore('b',-1)">-1</button>
+          </div>
+        </div>
+      </div>
+      <div class="sep"></div>
+      <button onclick="resetScores()" style="width:100%;font-size:0.7rem">점수 초기화</button>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>선수 배치</h3>
+      <div id="place-hint">코트를 터치하여 배치</div>
+      <div class="player-token" data-player="A1" id="tok-A1">
+        <div class="token-circle" style="background:#e94560;color:#fff">A1</div>
+        <div><div class="token-label">팀A 선수 1</div><div class="token-hint">길게 눌러 드래그</div></div>
+      </div>
+      <div class="player-token" data-player="A2" id="tok-A2">
+        <div class="token-circle" style="background:#ff8fab;color:#fff">A2</div>
+        <div><div class="token-label">팀A 선수 2</div><div class="token-hint">길게 눌러 드래그</div></div>
+      </div>
+      <div class="player-token" data-player="B1" id="tok-B1">
+        <div class="token-circle" style="background:#00d4ff;color:#000">B1</div>
+        <div><div class="token-label">팀B 선수 1</div><div class="token-hint">길게 눌러 드래그</div></div>
+      </div>
+      <div class="player-token" data-player="B2" id="tok-B2">
+        <div class="token-circle" style="background:#4ecdc4;color:#000">B2</div>
+        <div><div class="token-label">팀B 선수 2</div><div class="token-hint">길게 눌러 드래그</div></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>포메이션</h3>
+      <div id="formation-btns">
+        <button onclick="setFormation('front-back')">↕ 전후 포메이션</button>
+        <button onclick="setFormation('side-by-side')">↔ 좌우 포메이션</button>
+        <button onclick="setFormation('attack')">⚔ 공격 대형</button>
+        <button onclick="setFormation('defense')">🛡 수비 대형</button>
+        <button onclick="setFormation('rotate')">🔃 로테이션</button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>범례</h3>
+      <div class="legend">
+        <div class="legend-item"><div class="legend-color" style="background:#e94560"></div>팀 A 코트</div>
+        <div class="legend-item"><div class="legend-color" style="background:#00d4ff"></div>팀 B 코트</div>
+        <div class="legend-item"><div class="legend-color" style="background:#ffdd57"></div>이동 경로</div>
+        <div class="legend-item"><div class="legend-color" style="background:#4ecdc4"></div>셔틀 궤적</div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <h3>전략 메모</h3>
+      <textarea class="strategy-notes" placeholder="전략 메모&#10;예) 서비스 후 네트 전진"></textarea>
+    </div>
+
+  </div>
+</div>
+
+<!-- Touch ghost for sidebar drag -->
+<div id="drag-ghost"></div>
+
+<script>
+const canvas = document.getElementById('court');
+const ctx    = canvas.getContext('2d');
+const ghost  = document.getElementById('drag-ghost');
+
+let tool      = 'move';
+let drawColor = '#ffdd57';
+let drawWidth = 4;
+let drawings  = [];
+let isDrawing = false;
+let drawStart = null;
+let currentPath = [];
+let dragPlayer  = null;   // player being dragged ON canvas
+let dragOffset  = { x: 0, y: 0 };
+let serveTeam   = 'a';
+let scores      = { a: 0, b: 0 };
+
+// sidebar touch-drag state
+let sidebarDragPlayer = null;  // player key being dragged FROM sidebar
+let selectedToken     = null;  // tap-to-select state
+
+let courtW, courtH, offX, offY;
+
+const PLAYERS = {
+  A1: { x: 0.25, y: 0.25, color: '#e94560', textColor: '#fff', label: 'A1' },
+  A2: { x: 0.25, y: 0.75, color: '#ff8fab', textColor: '#fff', label: 'A2' },
+  B1: { x: 0.75, y: 0.25, color: '#00d4ff', textColor: '#000', label: 'B1' },
+  B2: { x: 0.75, y: 0.75, color: '#4ecdc4', textColor: '#000', label: 'B2' },
+};
+
+const SHUTTLE = { x: 0.5, y: 0.5 };
+
+// ── Layout ────────────────────────────────────────────────
+function resize() {
+  const cont = document.getElementById('court-container');
+  const W = cont.clientWidth  - 16;
+  const H = cont.clientHeight - 16;
+  const ratio = 13.4 / 6.1;
+  let cw, ch;
+  if (W / H > ratio) { ch = H; cw = ch * ratio; }
+  else               { cw = W; ch = cw / ratio; }
+  canvas.width  = cw;
+  canvas.height = ch;
+  const mx = cw * 0.045, my = ch * 0.05;
+  offX = mx; offY = my;
+  courtW = cw - mx * 2;
+  courtH = ch - my * 2;
+  draw();
+}
+
+function c2s(cx, cy) { return { x: offX + cx * courtW, y: offY + cy * courtH }; }
+function s2c(x,  y)  { return { cx: (x - offX) / courtW, cy: (y - offY) / courtH }; }
+
+// ── Draw ──────────────────────────────────────────────────
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawCourt();
+  drawings.forEach(renderItem);
+  drawPlayers();
+  drawShuttle();
+}
+
+function drawCourt() {
+  const grad = ctx.createLinearGradient(offX, offY, offX, offY + courtH);
+  grad.addColorStop(0, '#1b7a3e');
+  grad.addColorStop(1, '#145c30');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.roundRect(offX, offY, courtW, courtH, 4);
+  ctx.fill();
+
+  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 20; i++) {
+    const y = offY + (courtH / 20) * i;
+    ctx.beginPath(); ctx.moveTo(offX, y); ctx.lineTo(offX + courtW, y); ctx.stroke();
+  }
+
+  ctx.fillStyle = 'rgba(233,69,96,0.07)';
+  ctx.fillRect(offX, offY, courtW * 0.5, courtH);
+  ctx.fillStyle = 'rgba(0,212,255,0.07)';
+  ctx.fillRect(offX + courtW * 0.5, offY, courtW * 0.5, courtH);
+
+  function line(x1, y1, x2, y2, w = 1.5, style = '#ffffff') {
+    const p1 = c2s(x1 / 13.4, y1 / 6.1), p2 = c2s(x2 / 13.4, y2 / 6.1);
+    ctx.strokeStyle = style; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+  }
+
+  line(0, 0, 13.4, 0, 2.5); line(13.4, 0, 13.4, 6.1, 2.5);
+  line(13.4, 6.1, 0, 6.1, 2.5); line(0, 6.1, 0, 0, 2.5);
+  line(0, 0.46, 13.4, 0.46); line(0, 5.64, 13.4, 5.64);
+  line(4.72, 0, 4.72, 6.1); line(8.68, 0, 8.68, 6.1);
+  line(0.76, 0.46, 0.76, 5.64); line(12.64, 0.46, 12.64, 5.64);
+  line(4.72, 3.05, 8.68, 3.05);
+  line(6.7, 0, 6.7, 6.1, 3, 'rgba(255,255,255,0.95)');
+
+  const netX = offX + (6.7 / 13.4) * courtW;
+  const nh = courtH * 0.06, ntop = offY - nh;
+  ctx.strokeStyle = 'rgba(200,200,200,0.8)'; ctx.lineWidth = 3; ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(netX, ntop); ctx.lineTo(netX, offY + courtH + nh); ctx.stroke();
+  ctx.strokeStyle = 'rgba(180,180,180,0.3)'; ctx.lineWidth = 1;
+  for (let ny = ntop; ny < offY + courtH + nh; ny += 8) {
+    ctx.beginPath(); ctx.moveTo(netX - 5, ny); ctx.lineTo(netX + 5, ny); ctx.stroke();
+  }
+  const midY = offY + courtH * 0.5;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.beginPath(); ctx.roundRect(netX - 16, midY - 9, 32, 18, 4); ctx.fill();
+  ctx.fillStyle = '#fff';
+  ctx.font = `bold ${Math.max(9, courtW * 0.013)}px -apple-system,sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('NET', netX, midY);
+
+  const fsz = Math.max(10, courtW * 0.014);
+  ctx.font = `bold ${fsz}px -apple-system,sans-serif`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  const la = c2s(0.25, 0.06); ctx.fillStyle = 'rgba(233,69,96,0.55)';  ctx.fillText('팀  A', la.x, la.y);
+  const lb = c2s(0.75, 0.06); ctx.fillStyle = 'rgba(0,212,255,0.55)';  ctx.fillText('팀  B', lb.x, lb.y);
+
+  const sf = Math.max(16, courtW * 0.025);
+  ctx.font = `bold ${sf}px -apple-system,sans-serif`;
+  const sa = c2s(0.12, 0.5); ctx.fillStyle = 'rgba(233,69,96,0.6)';  ctx.fillText(scores.a, sa.x, sa.y);
+  const sb = c2s(0.88, 0.5); ctx.fillStyle = 'rgba(0,212,255,0.6)';  ctx.fillText(scores.b, sb.x, sb.y);
+}
+
+function renderItem(d) {
+  ctx.save();
+  ctx.strokeStyle = d.color; ctx.fillStyle = d.color;
+  ctx.lineWidth = d.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  if (d.type === 'arrow') {
+    drawArrow(d.x1, d.y1, d.x2, d.y2, d.color, d.width);
+  } else if (d.type === 'path') {
+    if (d.points.length < 2) { ctx.restore(); return; }
+    ctx.beginPath(); ctx.moveTo(d.points[0].x, d.points[0].y);
+    d.points.forEach((p, i) => { if (i > 0) ctx.lineTo(p.x, p.y); });
+    ctx.stroke();
+  } else if (d.type === 'shuttle-path') {
+    ctx.setLineDash([7, 5]);
+    ctx.beginPath(); ctx.moveTo(d.x1, d.y1); ctx.lineTo(d.x2, d.y2); ctx.stroke();
+    ctx.setLineDash([]);
+    drawArrowHead(d.x1, d.y1, d.x2, d.y2, d.color, d.width);
+  }
+  ctx.restore();
+}
+
+function drawArrow(x1, y1, x2, y2, color, w) {
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
+  drawArrowHead(x1, y1, x2, y2, color, w);
+}
+
+function drawArrowHead(x1, y1, x2, y2, color, w) {
+  const angle = Math.atan2(y2 - y1, x2 - x1);
+  const len = Math.max(14, w * 4);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - len * Math.cos(angle - 0.38), y2 - len * Math.sin(angle - 0.38));
+  ctx.lineTo(x2 - len * Math.cos(angle + 0.38), y2 - len * Math.sin(angle + 0.38));
+  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
+}
+
+function drawPlayers() {
+  const r = Math.max(16, courtW * 0.026);
+  Object.entries(PLAYERS).forEach(([key, p]) => {
+    const pos = c2s(p.x, p.y);
+    ctx.beginPath(); ctx.arc(pos.x + 2, pos.y + 2, r, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
+    ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color; ctx.fill();
+
+    // Highlight if selected via sidebar tap
+    if (selectedToken === key) {
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
+      ctx.setLineDash([4, 3]);
+      ctx.beginPath(); ctx.arc(pos.x, pos.y, r + 4, 0, Math.PI * 2); ctx.stroke();
+      ctx.setLineDash([]);
+    } else {
+      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
     }
-  </script>
+
+    ctx.fillStyle = p.textColor;
+    ctx.font = `bold ${Math.max(10, r * 0.68)}px -apple-system,sans-serif`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(p.label, pos.x, pos.y);
+  });
+}
+
+function drawShuttle() {
+  const pos = c2s(SHUTTLE.x, SHUTTLE.y);
+  const r = Math.max(10, courtW * 0.014);
+  ctx.beginPath(); ctx.arc(pos.x + 1, pos.y + 1, r, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
+  ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
+  ctx.fillStyle = '#fffde7'; ctx.fill();
+  ctx.strokeStyle = '#ffdd57'; ctx.lineWidth = 2; ctx.stroke();
+  ctx.font = `${Math.max(9, r)}px Arial`;
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText('🏸', pos.x, pos.y);
+}
+
+// ── Interaction helpers ───────────────────────────────────
+function getPos(e) {
+  const rect = canvas.getBoundingClientRect();
+  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+  const src = e.touches ? e.touches[0] : e;
+  return { x: (src.clientX - rect.left) * sx, y: (src.clientY - rect.top) * sy };
+}
+
+function playerAt(x, y) {
+  const r = Math.max(16, courtW * 0.026) + 8;
+  for (const [k, p] of Object.entries(PLAYERS)) {
+    if (Math.hypot(x - c2s(p.x, p.y).x, y - c2s(p.x, p.y).y) < r) return k;
+  }
+  return null;
+}
+
+function shuttleAt(x, y) {
+  const pos = c2s(SHUTTLE.x, SHUTTLE.y);
+  return Math.hypot(x - pos.x, y - pos.y) < Math.max(10, courtW * 0.014) + 10;
+}
+
+// ── Canvas touch / mouse ──────────────────────────────────
+canvas.addEventListener('mousedown',  onDown);
+canvas.addEventListener('mousemove',  onMv);
+canvas.addEventListener('mouseup',   onUp);
+canvas.addEventListener('mouseleave', onUp);
+canvas.addEventListener('touchstart', e => { e.preventDefault(); onDown(e); }, { passive: false });
+canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMv(e);   }, { passive: false });
+canvas.addEventListener('touchend',   e => { e.preventDefault(); onUp(e);   });
+
+function onDown(e) {
+  const p = getPos(e);
+
+  // If a sidebar token is selected, place it on tap
+  if (selectedToken && tool === 'move') {
+    const cc = s2c(p.x, p.y);
+    PLAYERS[selectedToken].x = Math.max(0, Math.min(1, cc.cx));
+    PLAYERS[selectedToken].y = Math.max(0, Math.min(1, cc.cy));
+    clearTokenSelection();
+    draw();
+    return;
+  }
+
+  if (tool === 'erase') { isDrawing = true; eraseAt(p.x, p.y); return; }
+
+  if (tool === 'move') {
+    const pl = playerAt(p.x, p.y);
+    if (pl) {
+      dragPlayer = pl;
+      const pp = c2s(PLAYERS[pl].x, PLAYERS[pl].y);
+      dragOffset = { x: p.x - pp.x, y: p.y - pp.y };
+      return;
+    }
+    if (shuttleAt(p.x, p.y)) {
+      dragPlayer = '__shuttle__';
+      const sp = c2s(SHUTTLE.x, SHUTTLE.y);
+      dragOffset = { x: p.x - sp.x, y: p.y - sp.y };
+      return;
+    }
+    return;
+  }
+
+  isDrawing = true;
+  drawStart = p;
+  if (tool === 'draw') currentPath = [p];
+}
+
+function onMv(e) {
+  const p = getPos(e);
+  if (tool === 'erase' && isDrawing) { eraseAt(p.x, p.y); return; }
+
+  if (dragPlayer) {
+    const cc = s2c(p.x - dragOffset.x, p.y - dragOffset.y);
+    if (dragPlayer === '__shuttle__') {
+      SHUTTLE.x = Math.max(0, Math.min(1, cc.cx));
+      SHUTTLE.y = Math.max(0, Math.min(1, cc.cy));
+    } else {
+      PLAYERS[dragPlayer].x = Math.max(0, Math.min(1, cc.cx));
+      PLAYERS[dragPlayer].y = Math.max(0, Math.min(1, cc.cy));
+    }
+    draw(); return;
+  }
+
+  if (!isDrawing) return;
+
+  if (tool === 'draw') {
+    currentPath.push(p);
+    draw();
+    ctx.save();
+    ctx.strokeStyle = drawColor; ctx.lineWidth = drawWidth;
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(currentPath[0].x, currentPath[0].y);
+    currentPath.forEach((pt, i) => { if (i > 0) ctx.lineTo(pt.x, pt.y); });
+    ctx.stroke(); ctx.restore();
+  } else {
+    drawPreview(p);
+  }
+}
+
+function drawPreview(p) {
+  if (!drawStart) return;
+  draw();
+  ctx.save(); ctx.globalAlpha = 0.75;
+  ctx.strokeStyle = drawColor; ctx.fillStyle = drawColor;
+  ctx.lineWidth = drawWidth; ctx.lineCap = 'round';
+  if (tool === 'arrow') {
+    drawArrow(drawStart.x, drawStart.y, p.x, p.y, drawColor, drawWidth);
+  } else if (tool === 'shuttle') {
+    ctx.setLineDash([7, 5]);
+    ctx.beginPath(); ctx.moveTo(drawStart.x, drawStart.y); ctx.lineTo(p.x, p.y); ctx.stroke();
+    ctx.setLineDash([]);
+    drawArrowHead(drawStart.x, drawStart.y, p.x, p.y, drawColor, drawWidth);
+  }
+  ctx.restore();
+}
+
+function onUp(e) {
+  if (dragPlayer) { dragPlayer = null; return; }
+  if (!isDrawing)  return;
+  isDrawing = false;
+
+  let ep;
+  if (e.changedTouches) {
+    const rect = canvas.getBoundingClientRect();
+    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+    ep = { x: (e.changedTouches[0].clientX - rect.left) * sx,
+           y: (e.changedTouches[0].clientY - rect.top)  * sy };
+  } else { ep = getPos(e); }
+
+  if (tool === 'arrow' && drawStart)
+    drawings.push({ type:'arrow', x1:drawStart.x, y1:drawStart.y, x2:ep.x, y2:ep.y, color:drawColor, width:drawWidth });
+  else if (tool === 'shuttle' && drawStart)
+    drawings.push({ type:'shuttle-path', x1:drawStart.x, y1:drawStart.y, x2:ep.x, y2:ep.y, color:'#4ecdc4', width:drawWidth });
+  else if (tool === 'draw' && currentPath.length > 1)
+    drawings.push({ type:'path', points:[...currentPath], color:drawColor, width:drawWidth });
+
+  drawStart = null; currentPath = []; draw();
+}
+
+function eraseAt(x, y) {
+  const thr = 20;
+  drawings = drawings.filter(d => {
+    if (d.type === 'arrow' || d.type === 'shuttle-path')
+      return !nearSeg(x, y, d.x1, d.y1, d.x2, d.y2, thr);
+    if (d.type === 'path')
+      return !d.points.some((pt, i) => i > 0 && nearSeg(x, y, d.points[i-1].x, d.points[i-1].y, pt.x, pt.y, thr));
+    return true;
+  });
+  draw();
+}
+
+function nearSeg(px, py, x1, y1, x2, y2, thr) {
+  const dx = x2-x1, dy = y2-y1, l2 = dx*dx+dy*dy;
+  if (!l2) return Math.hypot(px-x1, py-y1) < thr;
+  const t = Math.max(0, Math.min(1, ((px-x1)*dx+(py-y1)*dy)/l2));
+  return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)) < thr;
+}
+
+// ── Sidebar token interactions (touch-friendly) ───────────
+// Method A: tap-to-select → tap on court to place
+// Method B: long-press drag → ghost follows finger → drop on court
+
+const LONG_PRESS_MS = 350;
+let tokenPressTimer = null;
+let tokenPressKey   = null;
+let tokenPressTouch = null;
+
+document.querySelectorAll('.player-token').forEach(el => {
+  const key = el.dataset.player;
+
+  // ─ Tap: select / deselect
+  el.addEventListener('click', () => {
+    if (sidebarDragPlayer) return; // ignore if just finished a drag
+    if (selectedToken === key) {
+      clearTokenSelection();
+    } else {
+      setTokenSelection(key);
+    }
+  });
+
+  // ─ Touch long-press drag
+  el.addEventListener('touchstart', e => {
+    tokenPressKey   = key;
+    tokenPressTouch = e.touches[0];
+    tokenPressTimer = setTimeout(() => startSidebarDrag(key, e.touches[0]), LONG_PRESS_MS);
+  }, { passive: true });
+
+  el.addEventListener('touchmove', e => {
+    if (tokenPressTimer) { clearTimeout(tokenPressTimer); tokenPressTimer = null; }
+    if (sidebarDragPlayer) moveSidebarGhost(e.touches[0]);
+  }, { passive: true });
+
+  el.addEventListener('touchend', e => {
+    if (tokenPressTimer) { clearTimeout(tokenPressTimer); tokenPressTimer = null; }
+    if (sidebarDragPlayer) dropSidebarDrag(e.changedTouches[0]);
+  }, { passive: true });
+
+  el.addEventListener('touchcancel', () => {
+    if (tokenPressTimer) { clearTimeout(tokenPressTimer); tokenPressTimer = null; }
+    endSidebarGhost();
+  }, { passive: true });
+});
+
+function setTokenSelection(key) {
+  clearTokenSelection();
+  selectedToken = key;
+  document.getElementById('tok-' + key)?.classList.add('selected');
+  document.getElementById('place-hint').style.display = 'block';
+  draw();
+}
+
+function clearTokenSelection() {
+  if (selectedToken) document.getElementById('tok-' + selectedToken)?.classList.remove('selected');
+  selectedToken = null;
+  document.getElementById('place-hint').style.display = 'none';
+  draw();
+}
+
+function startSidebarDrag(key, touch) {
+  sidebarDragPlayer = key;
+  clearTokenSelection();
+  const p = PLAYERS[key];
+  ghost.style.display = 'flex';
+  ghost.style.background = p.color;
+  ghost.style.color = p.textColor;
+  ghost.textContent = key;
+  moveSidebarGhost(touch);
+}
+
+function moveSidebarGhost(touch) {
+  if (!sidebarDragPlayer) return;
+  ghost.style.left = touch.clientX + 'px';
+  ghost.style.top  = touch.clientY + 'px';
+}
+
+function dropSidebarDrag(touch) {
+  if (!sidebarDragPlayer) return;
+  const rect = canvas.getBoundingClientRect();
+  if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
+      touch.clientY >= rect.top  && touch.clientY <= rect.bottom) {
+    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
+    const x = (touch.clientX - rect.left) * sx;
+    const y = (touch.clientY - rect.top)  * sy;
+    const cc = s2c(x, y);
+    PLAYERS[sidebarDragPlayer].x = Math.max(0, Math.min(1, cc.cx));
+    PLAYERS[sidebarDragPlayer].y = Math.max(0, Math.min(1, cc.cy));
+    draw();
+  }
+  endSidebarGhost();
+}
+
+function endSidebarGhost() {
+  ghost.style.display = 'none';
+  sidebarDragPlayer = null;
+}
+
+// Desktop drag-drop still works for non-touch
+document.querySelectorAll('.player-token').forEach(el => {
+  el.setAttribute('draggable', 'true');
+  el.addEventListener('dragstart', e => e.dataTransfer.setData('player', el.dataset.player));
+});
+canvas.addEventListener('dragover', e => e.preventDefault());
+canvas.addEventListener('drop', e => {
+  e.preventDefault();
+  const pl = e.dataTransfer.getData('player');
+  if (pl && PLAYERS[pl]) {
+    const p = getPos(e); const cc = s2c(p.x, p.y);
+    PLAYERS[pl].x = Math.max(0, Math.min(1, cc.cx));
+    PLAYERS[pl].y = Math.max(0, Math.min(1, cc.cy));
+    draw();
+  }
+});
+
+// ── Controls ──────────────────────────────────────────────
+function setTool(t) {
+  tool = t;
+  ['move','arrow','draw','shuttle','erase'].forEach(id =>
+    document.getElementById('btn-'+id)?.classList.toggle('active', id === t));
+  if (t !== 'move') clearTokenSelection();
+}
+
+function setColor(c) {
+  drawColor = c;
+  document.querySelectorAll('.color-btn').forEach(btn =>
+    btn.classList.toggle('active', btn.style.background === c));
+}
+
+function setWidth(w) {
+  drawWidth = w;
+  ['2','4','7'].forEach(v => document.getElementById('w'+v)?.classList.toggle('active', +v === w));
+}
+
+function undoLast()     { if (drawings.length) { drawings.pop(); draw(); } }
+function clearDrawings(){ drawings = []; draw(); }
+
+function resetPlayers() {
+  PLAYERS.A1.x = 0.25; PLAYERS.A1.y = 0.25;
+  PLAYERS.A2.x = 0.25; PLAYERS.A2.y = 0.75;
+  PLAYERS.B1.x = 0.75; PLAYERS.B1.y = 0.25;
+  PLAYERS.B2.x = 0.75; PLAYERS.B2.y = 0.75;
+  SHUTTLE.x = 0.5; SHUTTLE.y = 0.5;
+  clearTokenSelection();
+  draw();
+}
+
+function addScore(t, v) {
+  scores[t] = Math.max(0, scores[t] + v);
+  document.getElementById('score-'+t).textContent = scores[t];
+  draw();
+}
+
+function resetScores() {
+  scores.a = 0; scores.b = 0;
+  document.getElementById('score-a').textContent = '0';
+  document.getElementById('score-b').textContent = '0';
+  draw();
+}
+
+function toggleServe() {
+  serveTeam = serveTeam === 'a' ? 'b' : 'a';
+  document.getElementById('shuttle-indicator').style.borderColor =
+    serveTeam === 'a' ? '#e94560' : '#00d4ff';
+}
+
+function setFormation(type) {
+  drawings = [];
+  const a = [];
+
+  if (type === 'front-back') {
+    PLAYERS.A1.x = 0.38; PLAYERS.A1.y = 0.5;
+    PLAYERS.A2.x = 0.15; PLAYERS.A2.y = 0.5;
+    PLAYERS.B1.x = 0.62; PLAYERS.B1.y = 0.5;
+    PLAYERS.B2.x = 0.85; PLAYERS.B2.y = 0.5;
+  } else if (type === 'side-by-side') {
+    PLAYERS.A1.x = 0.25; PLAYERS.A1.y = 0.3;
+    PLAYERS.A2.x = 0.25; PLAYERS.A2.y = 0.7;
+    PLAYERS.B1.x = 0.75; PLAYERS.B1.y = 0.3;
+    PLAYERS.B2.x = 0.75; PLAYERS.B2.y = 0.7;
+  } else if (type === 'attack') {
+    PLAYERS.A1.x = 0.4;  PLAYERS.A1.y = 0.3;
+    PLAYERS.A2.x = 0.4;  PLAYERS.A2.y = 0.7;
+    PLAYERS.B1.x = 0.65; PLAYERS.B1.y = 0.5;
+    PLAYERS.B2.x = 0.82; PLAYERS.B2.y = 0.5;
+    [['A1',0.49,0.3],['A2',0.49,0.7]].forEach(([k,tx,ty]) => {
+      const s = c2s(PLAYERS[k].x, PLAYERS[k].y), t2 = c2s(tx, ty);
+      a.push({ type:'arrow', x1:s.x, y1:s.y, x2:t2.x, y2:t2.y, color:'#ffdd57', width:3 });
+    });
+  } else if (type === 'defense') {
+    PLAYERS.A1.x = 0.18; PLAYERS.A1.y = 0.28;
+    PLAYERS.A2.x = 0.18; PLAYERS.A2.y = 0.72;
+    PLAYERS.B1.x = 0.82; PLAYERS.B1.y = 0.28;
+    PLAYERS.B2.x = 0.82; PLAYERS.B2.y = 0.72;
+  } else if (type === 'rotate') {
+    PLAYERS.A1.x = 0.32; PLAYERS.A1.y = 0.3;
+    PLAYERS.A2.x = 0.18; PLAYERS.A2.y = 0.7;
+    PLAYERS.B1.x = 0.68; PLAYERS.B1.y = 0.3;
+    PLAYERS.B2.x = 0.82; PLAYERS.B2.y = 0.7;
+    [['A1','A2'],['A2','A1'],['B1','B2'],['B2','B1']].forEach(([f, t2]) => {
+      const s = c2s(PLAYERS[f].x, PLAYERS[f].y), e2 = c2s(PLAYERS[t2].x, PLAYERS[t2].y);
+      a.push({ type:'arrow', x1:s.x, y1:s.y, x2:e2.x, y2:e2.y, color:'#a29bfe', width:3 });
+    });
+  }
+
+  drawings = a;
+  clearTokenSelection();
+  draw();
+}
+
+window.addEventListener('resize', resize);
+resize();
+</script>
 </body>
 </html>
