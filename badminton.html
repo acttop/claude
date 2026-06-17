@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>배드민턴 복식 로테이션 시뮬레이터</title>
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box; margin: 0; padding: 0;
+      -webkit-tap-highlight-color: transparent;
+      touch-action: manipulation;
+    }
+    :root {
+      --bg: #0a0f1e;
+      --surface: #111827;
+      --surface2: #1f2937;
+      --green: #22c55e;
+      --blue: #3b82f6;
+      --yellow: #fbbf24;
+      --red: #ef4444;
+      --text: #f1f5f9;
+      --muted: #94a3b8;
+      --court: #166534;
+      --court2: #14532d;
+      --radius: 12px;
+    }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', sans-serif;
+      min-height: 100vh;
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: max(16px, env(safe-area-inset-top))
+               max(16px, env(safe-area-inset-right))
+               max(24px, env(safe-area-inset-bottom))
+               max(16px, env(safe-area-inset-left));
+      -webkit-overflow-scrolling: touch;
+      overflow-x: hidden;
+    }
+    .app { width: 100%; max-width: 480px; }
+
+    .screen { display: none; }
+    .screen.active { display: block; }
+
+    /* ── INTRO ── */
+    .intro-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 20px; padding: 32px 0;
+    }
+    .intro-icon { font-size: 64px; line-height: 1; }
+    .intro-title { font-size: 1.7rem; font-weight: 900; text-align: center; line-height: 1.3;
+      background: linear-gradient(135deg, #4ade80, #60a5fa);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .intro-sub { color: var(--muted); text-align: center; font-size: 0.95rem; }
+    .scenario-chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+    .chip {
+      background: var(--surface2); border-radius: 20px;
+      padding: 6px 14px; font-size: 0.82rem; color: var(--muted);
+      border: 1px solid #334155;
+    }
+    .btn-start {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border: none; border-radius: var(--radius);
+      color: #fff; font-size: 1.1rem; font-weight: 700;
+      padding: 14px 40px; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(34,197,94,0.3);
+      transition: transform 0.1s, box-shadow 0.1s;
+    }
+    .btn-start:hover { transform: translateY(-2px); box-shadow: 0 6px 24px rgba(34,197,94,0.4); }
+    .btn-start:active { transform: scale(0.97); }
+
+    /* ── QUIZ HEADER ── */
+    .quiz-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .progress-bar {
+      flex: 1; height: 6px; background: var(--surface2); border-radius: 3px; overflow: hidden;
+    }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #22c55e, #16a34a); transition: width 0.4s ease; }
+    .score-badge {
+      background: var(--surface2); border-radius: 20px;
+      padding: 4px 12px; font-size: 0.85rem; font-weight: 700;
+      color: var(--green); border: 1px solid #334155; white-space: nowrap;
+    }
+
+    /* ── SCENARIO INFO ── */
+    .scenario-num {
+      display: inline-block;
+      background: linear-gradient(135deg, #22c55e, #3b82f6);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+      font-size: 0.8rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .scenario-title {
+      font-size: 1.25rem; font-weight: 800; margin-bottom: 8px;
+    }
+    .scenario-situation {
+      background: var(--surface); border-left: 3px solid var(--yellow);
+      border-radius: 0 8px 8px 0; padding: 10px 14px;
+      font-size: 0.88rem; color: var(--text); line-height: 1.5;
+      margin-bottom: 12px;
+    }
+    .formation-tag {
+      display: inline-block; background: var(--surface2);
+      border-radius: 6px; padding: 4px 10px;
+      font-size: 0.78rem; color: var(--muted); margin-bottom: 14px;
+    }
+
+    /* ── MAIN COURT ── */
+    .court-wrap {
+      position: relative; background: var(--surface); border-radius: var(--radius);
+      padding: 8px; margin-bottom: 14px;
+      border: 1px solid #1e293b;
+    }
+    #main-court { display: block; width: 100%; height: auto; border-radius: 8px; }
+
+    /* ── OPTIONS ── */
+    .options-label { font-size: 0.85rem; color: var(--muted); margin-bottom: 10px; font-weight: 600; }
+    .options-grid {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 10px; margin-bottom: 14px;
+    }
+    .option-card {
+      background: var(--surface); border: 2px solid #1e293b;
+      border-radius: var(--radius); padding: 10px;
+      cursor: pointer; transition: border-color 0.15s, transform 0.1s, box-shadow 0.15s;
+      display: flex; flex-direction: column; align-items: center; gap: 8px;
+      user-select: none; -webkit-user-select: none;
+    }
+    @media (hover: hover) {
+      .option-card:hover { border-color: #4b5563; transform: translateY(-2px); box-shadow: 0 4px 16px rgba(0,0,0,0.3); }
+    }
+    .option-card:active { transform: scale(0.96); background: #1e293b; }
+    .option-card.selected-correct { border-color: var(--green); background: #052e16; box-shadow: 0 0 0 3px rgba(34,197,94,0.2); }
+    .option-card.selected-wrong { border-color: var(--red); background: #1c0a0a; box-shadow: 0 0 0 3px rgba(239,68,68,0.2); }
+    .option-card.show-correct { border-color: var(--green); background: #052e16; }
+    .option-card.disabled { cursor: default; pointer-events: none; }
+    .option-label-badge {
+      font-size: 0.75rem; font-weight: 800; padding: 2px 10px;
+      border-radius: 12px; background: var(--surface2);
+      color: var(--muted); letter-spacing: 0.5px;
+    }
+    .option-card.selected-correct .option-label-badge { background: var(--green); color: #fff; }
+    .option-card.selected-wrong .option-label-badge { background: var(--red); color: #fff; }
+    .option-card.show-correct .option-label-badge { background: var(--green); color: #fff; }
+    .option-mini-canvas { display: block; border-radius: 6px; width: 100%; height: auto; }
+    .option-desc {
+      font-size: 0.75rem; color: var(--muted); text-align: center; line-height: 1.4;
+    }
+    .option-card.selected-correct .option-desc { color: var(--green); }
+    .option-card.selected-wrong .option-desc { color: var(--red); }
+    .option-card.show-correct .option-desc { color: var(--green); }
+
+    /* ── FEEDBACK ── */
+    .feedback-panel {
+      background: var(--surface); border-radius: var(--radius);
+      padding: 16px; display: flex; flex-direction: column; gap: 10px;
+      border: 1px solid #1e293b; margin-bottom: 14px;
+    }
+    .feedback-panel.hidden { display: none; }
+    .feedback-row { display: flex; align-items: center; gap: 10px; }
+    .feedback-icon { font-size: 1.5rem; }
+    .feedback-verdict { font-size: 1rem; font-weight: 800; }
+    .feedback-verdict.correct { color: var(--green); }
+    .feedback-verdict.wrong { color: var(--red); }
+    .explanation {
+      font-size: 0.84rem; color: var(--text); line-height: 1.6;
+      background: var(--surface2); border-radius: 8px; padding: 12px;
+    }
+    .explanation strong { color: var(--yellow); }
+    .btn-next {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      border: none; border-radius: 8px;
+      color: #fff; font-size: 0.95rem; font-weight: 700;
+      padding: 11px; cursor: pointer; width: 100%;
+      transition: opacity 0.15s, transform 0.1s;
+    }
+    .btn-next:hover { opacity: 0.9; }
+    .btn-next:active { transform: scale(0.98); }
+
+    /* ── RESULTS ── */
+    .results-wrap {
+      display: flex; flex-direction: column; align-items: center;
+      gap: 20px; padding: 32px 0;
+    }
+    .results-icon { font-size: 72px; }
+    .results-title { font-size: 1.6rem; font-weight: 900; text-align: center; }
+    .score-circle {
+      width: 120px; height: 120px; border-radius: 50%;
+      background: conic-gradient(var(--green) 0%, var(--surface2) 0%);
+      display: flex; align-items: center; justify-content: center;
+      position: relative;
+    }
+    .score-circle-inner {
+      width: 90px; height: 90px; border-radius: 50%;
+      background: var(--surface); display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    .score-num { font-size: 2rem; font-weight: 900; color: var(--green); line-height: 1; }
+    .score-denom { font-size: 0.8rem; color: var(--muted); }
+    .score-message { font-size: 1rem; color: var(--muted); text-align: center; }
+    .results-breakdown {
+      width: 100%; display: flex; flex-direction: column; gap: 8px;
+    }
+    .result-row {
+      background: var(--surface); border-radius: 8px;
+      padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+      border: 1px solid #1e293b;
+    }
+    .result-icon { font-size: 1.1rem; }
+    .result-name { flex: 1; font-size: 0.9rem; }
+    .result-status { font-size: 0.8rem; font-weight: 700; }
+    .result-status.ok { color: var(--green); }
+    .result-status.fail { color: var(--red); }
+    .btn-restart {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      border: none; border-radius: var(--radius);
+      color: #fff; font-size: 1rem; font-weight: 700;
+      padding: 13px 36px; cursor: pointer;
+      box-shadow: 0 4px 20px rgba(34,197,94,0.3);
+      transition: transform 0.1s;
+    }
+    .btn-restart:active { transform: scale(0.97); }
+  </style>
+</head>
+<body>
+<div class="app">
+
+  <!-- INTRO SCREEN -->
+  <div id="intro-screen" class="screen active">
+    <div class="intro-wrap">
+      <div class="intro-icon">🏸</div>
+      <h1 class="intro-title">배드민턴 복식<br>로테이션 시뮬레이터</h1>
+      <p class="intro-sub">6가지 실전 상황에서 올바른 로테이션을 선택하세요!</p>
+      <div class="scenario-chips">
+        <span class="chip">① 오른쪽 강공</span>
+        <span class="chip">② 왼쪽 드롭</span>
+        <span class="chip">③ 중앙 스매시</span>
+        <span class="chip">④ 공격 전환</span>
+        <span class="chip">⑤ 크로스 공격</span>
+        <span class="chip">⑥ 왼쪽 코너 수비</span>
+        <span class="chip">⑦ 오른쪽 코너 수비</span>
+        <span class="chip">⑧ 로브 역할 교체</span>
+        <span class="chip">⑨ 오른쪽 드롭 처리</span>
+        <span class="chip">⑩ 직선 스매시 대형</span>
+      </div>
+      <div style="background:var(--surface);border-radius:var(--radius);padding:14px 18px;font-size:0.83rem;color:var(--muted);line-height:1.6;border:1px solid #1e293b;width:100%">
+        <strong style="color:var(--text)">게임 방법</strong><br>
+        코트 상황을 보고 4개의 선택지 중 올바른 로테이션을 고르세요.<br>
+        <span style="color:#4ade80">P1 (초록)</span>은 왼쪽, <span style="color:#60a5fa">P2 (파랑)</span>은 오른쪽 선수입니다.
+      </div>
+      <button class="btn-start" onclick="startQuiz()">시작하기</button>
+    </div>
+  </div>
+
+  <!-- QUIZ SCREEN -->
+  <div id="quiz-screen" class="screen">
+    <div class="quiz-header">
+      <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
+      <div class="score-badge">점수 <span id="score-disp">0</span>/10</div>
+    </div>
+    <div class="scenario-num" id="s-num"></div>
+    <h2 class="scenario-title" id="s-title"></h2>
+    <div class="scenario-situation" id="s-situation"></div>
+    <div class="formation-tag" id="s-formation"></div>
+    <div class="court-wrap">
+      <canvas id="main-court" width="440" height="560"></canvas>
+    </div>
+    <div class="options-label">올바른 로테이션을 선택하세요:</div>
+    <div class="options-grid" id="options-grid"></div>
+    <div class="feedback-panel hidden" id="feedback-panel">
+      <div class="feedback-row">
+        <span class="feedback-icon" id="fb-icon"></span>
+        <span class="feedback-verdict" id="fb-verdict"></span>
+      </div>
+      <div class="explanation" id="fb-explanation"></div>
+      <button class="btn-next" id="btn-next" onclick="nextScenario()">다음 문제</button>
+    </div>
+  </div>
+
+  <!-- RESULTS SCREEN -->
+  <div id="results-screen" class="screen">
+    <div class="results-wrap">
+      <div class="results-icon" id="r-icon">🏆</div>
+      <h2 class="results-title">퀴즈 완료!</h2>
+      <div class="score-circle" id="score-circle">
+        <div class="score-circle-inner">
+          <div class="score-num" id="r-score">0</div>
+          <div class="score-denom">/ 10</div>
+        </div>
+      </div>
+      <div class="score-message" id="r-message"></div>
+      <div class="results-breakdown" id="r-breakdown"></div>
+      <button class="btn-restart" onclick="restartQuiz()">다시 도전하기</button>
+    </div>
+  </div>
+
+</div>
+<script>
+// ─────────────────────────────────────────────
+// SCENARIO DATA
+// x,y in [0,1]: x=left→right, y=0=opponent baseline, 0.5=net, 1.0=our baseline
+// ─────────────────────────────────────────────
+const SCENARIOS = [
+  {
+    num: 1, title: '상대 오른쪽 강공',
+    situation: '상대가 우리 코트 오른쪽(P2 구역)으로 강한 스매시를 날렸습니다!',
+    formation: '수비 대형 (좌우 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.28, y: 0.72 },
+      { id: 'p2', label: 'P2', x: 0.72, y: 0.72 }
+    ],
+    shuttle: { fx: 0.78, fy: 0.18, tx: 0.85, ty: 0.67 },
+    options: [
+      { label: 'A', desc: 'P2가 오른쪽 처리,\nP1이 중앙으로 이동',
+        players: [{ id:'p1', x:0.45, y:0.72 }, { id:'p2', x:0.85, y:0.67 }], correct: true },
+      { label: 'B', desc: 'P1이 오른쪽으로\n달려가 처리, P2 유지',
+        players: [{ id:'p1', x:0.85, y:0.67 }, { id:'p2', x:0.72, y:0.72 }], correct: false },
+      { label: 'C', desc: '두 선수 모두\n오른쪽으로 이동',
+        players: [{ id:'p1', x:0.6, y:0.72 }, { id:'p2', x:0.85, y:0.67 }], correct: false },
+      { label: 'D', desc: '현재 위치 유지,\n움직이지 않음',
+        players: [{ id:'p1', x:0.28, y:0.72 }, { id:'p2', x:0.72, y:0.72 }], correct: false }
+    ],
+    explanation: '오른쪽 강공은 해당 구역 <strong>P2가 처리</strong>합니다. P1은 P2가 이동한 빈 공간(중앙)을 메우기 위해 <strong>오른쪽으로 이동</strong>합니다. 한 선수가 끝으로 이동하면 파트너는 중앙을 커버하는 것이 로테이션의 핵심입니다!'
+  },
+  {
+    num: 2, title: '왼쪽 드롭샷',
+    situation: '상대가 우리 코트 왼쪽 네트 앞으로 날카로운 드롭샷을 쳤습니다!',
+    formation: '공격 대형 (앞뒤 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.55, y: 0.82 }
+    ],
+    shuttle: { fx: 0.22, fy: 0.32, tx: 0.12, ty: 0.55 },
+    options: [
+      { label: 'A', desc: 'P1이 왼쪽 네트로\n달려가 처리, P2 유지',
+        players: [{ id:'p1', x:0.12, y:0.56 }, { id:'p2', x:0.55, y:0.82 }], correct: true },
+      { label: 'B', desc: 'P2가 앞으로 달려가\n처리, P1은 뒤로',
+        players: [{ id:'p1', x:0.42, y:0.82 }, { id:'p2', x:0.12, y:0.56 }], correct: false },
+      { label: 'C', desc: 'P1이 왼쪽으로,\nP2도 함께 앞으로',
+        players: [{ id:'p1', x:0.12, y:0.56 }, { id:'p2', x:0.4, y:0.62 }], correct: false },
+      { label: 'D', desc: '두 선수 모두\n현재 위치 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.55, y:0.82 }], correct: false }
+    ],
+    explanation: '앞뒤 대형에서 <strong>앞 선수(P1)가 드롭샷을 처리</strong>합니다. 뒤 선수(P2)는 자리를 지키며 P1이 올린 공을 스매시할 준비를 합니다. P2가 앞으로 오면 뒤가 비어 상대의 클리어에 완전히 노출됩니다!'
+  },
+  {
+    num: 3, title: '중앙 스매시 수비',
+    situation: '상대가 두 선수 사이 중앙으로 강한 스매시를 날렸습니다! 누가 처리해야 할까요?',
+    formation: '수비 대형 (좌우 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.28, y: 0.72 },
+      { id: 'p2', label: 'P2', x: 0.72, y: 0.72 }
+    ],
+    shuttle: { fx: 0.5, fy: 0.15, tx: 0.5, ty: 0.72 },
+    options: [
+      { label: 'A', desc: 'P2가 중앙으로 이동해\n포핸드로 처리, P1 왼쪽 커버',
+        players: [{ id:'p1', x:0.2, y:0.72 }, { id:'p2', x:0.5, y:0.72 }], correct: true },
+      { label: 'B', desc: 'P1이 중앙으로 이동해\n처리, P2 오른쪽 커버',
+        players: [{ id:'p1', x:0.5, y:0.72 }, { id:'p2', x:0.8, y:0.72 }], correct: false },
+      { label: 'C', desc: '두 선수 모두\n중앙으로 몰림',
+        players: [{ id:'p1', x:0.42, y:0.72 }, { id:'p2', x:0.58, y:0.72 }], correct: false },
+      { label: 'D', desc: '각자 현재 위치에서\n팔을 뻗어 처리',
+        players: [{ id:'p1', x:0.28, y:0.72 }, { id:'p2', x:0.72, y:0.72 }], correct: false }
+    ],
+    explanation: '중앙 볼은 <strong>오른쪽 선수(P2)가 포핸드로 처리</strong>하는 것이 원칙입니다(오른손잡이 기준). P2가 중앙으로 이동하면 P1은 P2가 비운 왼쪽을 커버합니다. 사전에 "중앙은 내가!"라고 약속을 정해 두면 충돌과 빈 공간을 방지할 수 있습니다!'
+  },
+  {
+    num: 4, title: '공격 전환',
+    situation: 'P1이 어려운 공을 상대 백코트로 높이 올렸습니다! 이제 공격 대형으로 전환해야 합니다.',
+    formation: '수비 대형 → 공격 대형 전환',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.32, y: 0.75 },
+      { id: 'p2', label: 'P2', x: 0.68, y: 0.75 }
+    ],
+    shuttle: { fx: 0.32, fy: 0.75, tx: 0.52, ty: 0.08 },
+    options: [
+      { label: 'A', desc: 'P2가 네트로 전진,\nP1은 뒤에서 스매시 준비',
+        players: [{ id:'p1', x:0.45, y:0.82 }, { id:'p2', x:0.5, y:0.58 }], correct: true },
+      { label: 'B', desc: 'P1이 네트로 전진,\nP2는 뒤에서 준비',
+        players: [{ id:'p1', x:0.5, y:0.58 }, { id:'p2', x:0.5, y:0.82 }], correct: false },
+      { label: 'C', desc: '두 선수 모두\n네트 앞으로 전진',
+        players: [{ id:'p1', x:0.35, y:0.58 }, { id:'p2', x:0.65, y:0.58 }], correct: false },
+      { label: 'D', desc: '현재 좌우 대형\n그대로 유지',
+        players: [{ id:'p1', x:0.32, y:0.75 }, { id:'p2', x:0.68, y:0.75 }], correct: false }
+    ],
+    explanation: '<strong>P1이 리프트(올리기)를 쳤으므로 P1은 뒤에 남아</strong> 스매시를 준비합니다. P2는 빠르게 네트 앞으로 달려가 상대의 짧은 수비 리턴을 차단합니다. 앞뒤 공격 대형이 완성됩니다!'
+  },
+  {
+    num: 5, title: '크로스 공격',
+    situation: 'P2가 백코트에서 상대 왼쪽 코너를 향해 크로스 스매시를 쳤습니다!',
+    formation: '공격 대형 (앞뒤 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.55, y: 0.82 }
+    ],
+    shuttle: { fx: 0.55, fy: 0.82, tx: 0.15, ty: 0.12 },
+    options: [
+      { label: 'A', desc: 'P2가 오른쪽으로 이동\n(열린 코트 커버), P1 네트 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.75, y:0.82 }], correct: true },
+      { label: 'B', desc: 'P2가 왼쪽으로 이동,\nP1도 왼쪽으로',
+        players: [{ id:'p1', x:0.25, y:0.60 }, { id:'p2', x:0.3, y:0.82 }], correct: false },
+      { label: 'C', desc: '두 선수 모두\n현재 위치 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.55, y:0.82 }], correct: false },
+      { label: 'D', desc: 'P1이 왼쪽 네트로,\nP2도 왼쪽으로',
+        players: [{ id:'p1', x:0.2, y:0.60 }, { id:'p2', x:0.3, y:0.82 }], correct: false }
+    ],
+    explanation: '크로스 스매시 후 우리 코트 <strong>오른쪽이 비어</strong>버립니다. P2는 오른쪽으로 이동해 상대의 크로스 리턴을 대비합니다. P1은 네트에서 직선 리턴을 차단합니다. 공격 후에도 항상 <strong>열린 코트를 커버</strong>하는 것이 핵심입니다!'
+  },
+  {
+    num: 6, title: '왼쪽 코너 수비',
+    situation: '상대가 우리 왼쪽 백코너로 강한 스매시를 날렸습니다!',
+    formation: '수비 대형 (좌우 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.28, y: 0.72 },
+      { id: 'p2', label: 'P2', x: 0.72, y: 0.72 }
+    ],
+    shuttle: { fx: 0.22, fy: 0.15, tx: 0.1, ty: 0.92 },
+    options: [
+      { label: 'A', desc: 'P1이 왼쪽 코너로 후퇴,\nP2가 중앙-왼쪽으로 이동',
+        players: [{ id:'p1', x:0.1, y:0.92 }, { id:'p2', x:0.45, y:0.72 }], correct: true },
+      { label: 'B', desc: 'P1이 왼쪽 코너로,\nP2는 현재 위치 유지',
+        players: [{ id:'p1', x:0.1, y:0.92 }, { id:'p2', x:0.72, y:0.72 }], correct: false },
+      { label: 'C', desc: '두 선수 모두\n왼쪽으로 이동',
+        players: [{ id:'p1', x:0.1, y:0.92 }, { id:'p2', x:0.28, y:0.72 }], correct: false },
+      { label: 'D', desc: 'P2가 왼쪽 코너로,\nP1은 현재 위치',
+        players: [{ id:'p1', x:0.28, y:0.72 }, { id:'p2', x:0.1, y:0.92 }], correct: false }
+    ],
+    explanation: '왼쪽 코너 공은 <strong>왼쪽 담당 P1이 처리</strong>합니다. P1이 코너로 이동하면 중앙이 크게 비어버립니다. <strong>P2는 중앙-왼쪽으로 이동</strong>해 빈 공간을 메웁니다. P2가 오른쪽에 그대로 있으면 중앙이 비어 상대에게 쉬운 공격 기회를 줍니다!'
+  },
+  {
+    num: 7, title: '오른쪽 백코너 수비',
+    situation: '상대가 우리 오른쪽 백코너로 강한 스매시를 날렸습니다!',
+    formation: '수비 대형 (좌우 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.28, y: 0.72 },
+      { id: 'p2', label: 'P2', x: 0.72, y: 0.72 }
+    ],
+    shuttle: { fx: 0.78, fy: 0.15, tx: 0.92, ty: 0.90 },
+    options: [
+      { label: 'A', desc: 'P2가 오른쪽 코너로 후퇴,\nP1이 중앙-오른쪽으로 이동',
+        players: [{ id:'p1', x:0.52, y:0.72 }, { id:'p2', x:0.92, y:0.90 }], correct: true },
+      { label: 'B', desc: 'P1이 오른쪽 코너로\n달려가고, P2는 유지',
+        players: [{ id:'p1', x:0.92, y:0.90 }, { id:'p2', x:0.72, y:0.72 }], correct: false },
+      { label: 'C', desc: '두 선수 모두 오른쪽으로\n크게 이동 (왼쪽 노출)',
+        players: [{ id:'p1', x:0.65, y:0.72 }, { id:'p2', x:0.92, y:0.90 }], correct: false },
+      { label: 'D', desc: '현재 위치 유지,\n움직이지 않음',
+        players: [{ id:'p1', x:0.28, y:0.72 }, { id:'p2', x:0.72, y:0.72 }], correct: false }
+    ],
+    explanation: '오른쪽 코너 공은 <strong>오른쪽 담당 P2가 처리</strong>합니다. P2가 코너로 이동하면 중앙이 비어버립니다. <strong>P1은 중앙-오른쪽으로 이동</strong>해 빈 공간을 메웁니다. P1이 너무 오른쪽으로 이동하면 왼쪽 코트 전체가 비어버리니 주의하세요!'
+  },
+  {
+    num: 8, title: '로브 대응 - 역할 교체',
+    situation: '공격 대형 중 상대가 P1(앞선수) 머리 위로 높은 로브를 올렸습니다! P1이 뒤로 물러나야 합니다.',
+    formation: '공격 대형 → 역할 교체',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.50, y: 0.82 }
+    ],
+    shuttle: { fx: 0.42, fy: 0.35, tx: 0.22, ty: 0.88 },
+    options: [
+      { label: 'A', desc: 'P1이 왼쪽 뒤로 후퇴,\nP2가 네트 앞으로 전진',
+        players: [{ id:'p1', x:0.22, y:0.88 }, { id:'p2', x:0.50, y:0.60 }], correct: true },
+      { label: 'B', desc: 'P1이 왼쪽 뒤로 후퇴,\nP2도 뒤로 물러남',
+        players: [{ id:'p1', x:0.22, y:0.88 }, { id:'p2', x:0.60, y:0.82 }], correct: false },
+      { label: 'C', desc: 'P2가 왼쪽으로 달려가\n로브 처리, P1 네트 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.22, y:0.88 }], correct: false },
+      { label: 'D', desc: '두 선수 모두\n현재 위치 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.50, y:0.82 }], correct: false }
+    ],
+    explanation: '로브로 앞선수(P1)가 뒤로 밀리면 <strong>자연스럽게 역할이 교체</strong>됩니다. P1은 로브 위치로 후퇴하여 공을 처리하고, <strong>P2는 빠르게 네트 앞으로 올라가</strong> 공격 대형을 유지합니다. 뒷선수가 함께 뒤로 가면 두 선수 모두 뒤로 몰려 네트가 완전히 비어버립니다!'
+  },
+  {
+    num: 9, title: '오른쪽 네트 드롭 처리',
+    situation: '공격 대형 중 상대가 우리 오른쪽 네트 앞으로 드롭샷을 쳤습니다!',
+    formation: '공격 대형 (앞뒤 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.50, y: 0.82 }
+    ],
+    shuttle: { fx: 0.78, fy: 0.32, tx: 0.88, ty: 0.55 },
+    options: [
+      { label: 'A', desc: 'P1이 오른쪽 네트로\n달려가 처리, P2 오른쪽으로',
+        players: [{ id:'p1', x:0.88, y:0.55 }, { id:'p2', x:0.65, y:0.82 }], correct: true },
+      { label: 'B', desc: 'P2가 앞으로 달려가\n처리, P1은 뒤로',
+        players: [{ id:'p1', x:0.42, y:0.82 }, { id:'p2', x:0.88, y:0.55 }], correct: false },
+      { label: 'C', desc: 'P1이 오른쪽으로,\nP2도 함께 앞으로',
+        players: [{ id:'p1', x:0.88, y:0.55 }, { id:'p2', x:0.72, y:0.65 }], correct: false },
+      { label: 'D', desc: 'P1이 제자리에서\n팔을 뻗어 처리',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.50, y:0.82 }], correct: false }
+    ],
+    explanation: '앞뒤 대형에서 <strong>오른쪽 드롭은 앞선수(P1)가 달려가 처리</strong>합니다. P1이 오른쪽으로 이동하면 왼쪽 중앙이 비게 되므로 <strong>P2는 오른쪽으로 조금 이동</strong>해 빈 공간을 커버합니다. P2가 앞으로 오면 뒤가 비어 위험해집니다!'
+  },
+  {
+    num: 10, title: '직선 스매시 후 대형',
+    situation: 'P2가 백코트 중앙에서 상대 오른쪽(직선)으로 스매시를 쳤습니다! 이제 어떻게 포지셔닝해야 할까요?',
+    formation: '공격 대형 (앞뒤 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.50, y: 0.82 }
+    ],
+    shuttle: { fx: 0.50, fy: 0.82, tx: 0.85, ty: 0.10 },
+    options: [
+      { label: 'A', desc: 'P2가 왼쪽으로 이동\n(크로스 리턴 대비), P1 네트 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.28, y:0.82 }], correct: true },
+      { label: 'B', desc: 'P2가 오른쪽으로 이동,\nP1도 오른쪽으로',
+        players: [{ id:'p1', x:0.65, y:0.60 }, { id:'p2', x:0.75, y:0.82 }], correct: false },
+      { label: 'C', desc: '두 선수 모두\n현재 위치 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.50, y:0.82 }], correct: false },
+      { label: 'D', desc: 'P1이 오른쪽 네트로,\nP2도 오른쪽으로',
+        players: [{ id:'p1', x:0.75, y:0.60 }, { id:'p2', x:0.75, y:0.82 }], correct: false }
+    ],
+    explanation: '직선 스매시(오른쪽) 후 <strong>우리 코트 왼쪽이 열립니다</strong>. 상대는 크로스(왼쪽)로 리턴할 가능성이 높으므로 <strong>P2는 왼쪽으로 이동</strong>해 크로스 리턴을 대비합니다. P1은 네트 중앙에서 직선 리턴을 차단합니다. 크로스 공격(5번)과 반대 방향임을 기억하세요!'
+  }
+];
+
+// ─────────────────────────────────────────────
+// GAME STATE
+// ─────────────────────────────────────────────
+let currentIdx = 0;
+let score = 0;
+let answered = false;
+let results = [];
+let animFrame = null;
+
+// ─────────────────────────────────────────────
+// CANVAS DRAWING UTILITIES
+// ─────────────────────────────────────────────
+const P1_COLOR = '#4ade80';
+const P2_COLOR = '#60a5fa';
+const OPP_COLOR = '#f87171';
+
+function playerColor(id) { return id === 'p1' ? P1_COLOR : P2_COLOR; }
+
+function toCanvas(rx, ry, cw, ch, pad) {
+  return {
+    x: pad + rx * (cw - pad * 2),
+    y: pad + ry * (ch - pad * 2)
+  };
+}
+
+function drawCourt(ctx, cw, ch, pad) {
+  // Dark background
+  ctx.fillStyle = '#0a0f1e';
+  ctx.fillRect(0, 0, cw, ch);
+
+  const iw = cw - pad * 2;
+  const ih = ch - pad * 2;
+  const lx = pad, rx = pad + iw;
+  const ty = pad, by = pad + ih;
+  const netY = pad + ih * 0.5;
+
+  // Court fill
+  ctx.fillStyle = '#14532d';
+  ctx.fillRect(lx, ty, iw, ih);
+
+  // Opponent zone (slightly different shade)
+  ctx.fillStyle = '#1a6334';
+  ctx.fillRect(lx, ty, iw, ih * 0.5);
+
+  // Service lines (dashed)
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([5, 5]);
+  // Opponent short service line (~30% from net toward opponent baseline)
+  const oppSL = pad + ih * 0.5 * 0.7;
+  // Our short service line (~30% from net toward our baseline)
+  const ourSL = netY + ih * 0.5 * 0.3;
+  ctx.beginPath(); ctx.moveTo(lx, oppSL); ctx.lineTo(rx, oppSL); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(lx, ourSL); ctx.lineTo(rx, ourSL); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Center line
+  const cx = pad + iw * 0.5;
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(cx, ty); ctx.lineTo(cx, by); ctx.stroke();
+  ctx.restore();
+
+  // Boundary
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(lx, ty, iw, ih);
+
+  // Net posts
+  ctx.strokeStyle = '#d1d5db';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(lx - 3, netY); ctx.lineTo(rx + 3, netY);
+  ctx.stroke();
+
+  // Net mesh lines
+  ctx.save();
+  ctx.strokeStyle = 'rgba(255,255,255,0.15)';
+  ctx.lineWidth = 1;
+  for (let nx = lx; nx <= rx; nx += 14) {
+    ctx.beginPath(); ctx.moveTo(nx, netY - 5); ctx.lineTo(nx, netY + 5); ctx.stroke();
+  }
+  ctx.restore();
+
+  // NET label
+  ctx.fillStyle = 'rgba(255,255,255,0.5)';
+  ctx.font = `bold ${Math.max(10, pad * 0.6)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('NET', cx, netY - 6);
+
+  // Zone labels
+  ctx.fillStyle = 'rgba(255,255,255,0.3)';
+  ctx.font = `${Math.max(9, pad * 0.55)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('상대 코트', cx, ty + 14);
+  ctx.fillText('우리 코트', cx, by - 6);
+}
+
+function drawPlayer(ctx, rx, ry, label, color, cw, ch, pad, r = 20) {
+  const { x, y } = toCanvas(rx, ry, cw, ch, pad);
+
+  // Shadow
+  ctx.save();
+  ctx.shadowColor = color;
+  ctx.shadowBlur = 12;
+
+  // Fill
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.fillStyle = color;
+  ctx.fill();
+  ctx.restore();
+
+  // Border
+  ctx.beginPath();
+  ctx.arc(x, y, r, 0, Math.PI * 2);
+  ctx.strokeStyle = '#ffffff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Label
+  ctx.fillStyle = '#0a0f1e';
+  ctx.font = `bold ${Math.max(10, r * 0.7)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y);
+  ctx.textBaseline = 'alphabetic';
+}
+
+function drawShuttle(ctx, rx, ry, cw, ch, pad, size = 10) {
+  const { x, y } = toCanvas(rx, ry, cw, ch, pad);
+  ctx.save();
+  ctx.shadowColor = '#fbbf24';
+  ctx.shadowBlur = 16;
+  // Birdie body
+  ctx.beginPath();
+  ctx.arc(x, y, size * 0.55, 0, Math.PI * 2);
+  ctx.fillStyle = '#fbbf24';
+  ctx.fill();
+  // Feather fan
+  ctx.beginPath();
+  ctx.moveTo(x, y - size * 0.55);
+  ctx.lineTo(x - size, y - size * 1.8);
+  ctx.lineTo(x + size, y - size * 1.8);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawArrow(ctx, x1, y1, x2, y2, color, dashed = false) {
+  const dx = x2 - x1, dy = y2 - y1;
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len < 1) return;
+  const ux = dx / len, uy = dy / len;
+  const headLen = 12;
+
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2.5;
+  if (dashed) ctx.setLineDash([6, 4]);
+
+  ctx.beginPath();
+  ctx.moveTo(x1, y1);
+  ctx.lineTo(x2 - ux * headLen, y2 - uy * headLen);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Arrowhead
+  const angle = Math.atan2(dy, dx);
+  ctx.beginPath();
+  ctx.moveTo(x2, y2);
+  ctx.lineTo(x2 - headLen * Math.cos(angle - 0.4), y2 - headLen * Math.sin(angle - 0.4));
+  ctx.lineTo(x2 - headLen * Math.cos(angle + 0.4), y2 - headLen * Math.sin(angle + 0.4));
+  ctx.closePath();
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawShuttleTrajectory(ctx, scenario, cw, ch, pad) {
+  const s = scenario.shuttle;
+  const from = toCanvas(s.fx, s.fy, cw, ch, pad);
+  const to = toCanvas(s.tx, s.ty, cw, ch, pad);
+
+  // Dashed trajectory line
+  ctx.save();
+  ctx.strokeStyle = 'rgba(251,191,36,0.6)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([6, 5]);
+  ctx.beginPath();
+  ctx.moveTo(from.x, from.y);
+  ctx.lineTo(to.x, to.y);
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // Arrow at end
+  drawArrow(ctx, from.x, from.y, to.x, to.y, 'rgba(251,191,36,0.8)');
+}
+
+function renderMainCourt(scenario, playerOverride = null, phase = 'initial') {
+  const canvas = document.getElementById('main-court');
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  const wrap = canvas.parentElement;
+  const logW = Math.max(280, wrap.clientWidth - 16);
+  const logH = Math.round(logW * 560 / 440);
+
+  canvas.width = Math.round(logW * dpr);
+  canvas.height = Math.round(logH * dpr);
+  canvas.style.width = logW + 'px';
+  canvas.style.height = logH + 'px';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const cw = logW, ch = logH;
+  const pad = Math.max(18, Math.round(logW * 0.055));
+  const pr = Math.max(16, Math.round(logW * 0.05));
+
+  drawCourt(ctx, cw, ch, pad);
+  drawShuttleTrajectory(ctx, scenario, cw, ch, pad);
+  drawShuttle(ctx, scenario.shuttle.tx, scenario.shuttle.ty, cw, ch, pad, Math.round(pr * 0.45));
+
+  const players = playerOverride || scenario.players;
+  players.forEach(p => {
+    drawPlayer(ctx, p.x, p.y, p.label || (p.id === 'p1' ? 'P1' : 'P2'),
+      playerColor(p.id), cw, ch, pad, pr);
+  });
+
+  if (phase === 'result' && playerOverride) {
+    scenario.players.forEach(init => {
+      const fin = playerOverride.find(p => p.id === init.id);
+      if (!fin) return;
+      if (Math.abs(fin.x - init.x) > 0.02 || Math.abs(fin.y - init.y) > 0.02) {
+        const from = toCanvas(init.x, init.y, cw, ch, pad);
+        const to = toCanvas(fin.x, fin.y, cw, ch, pad);
+        drawArrow(ctx, from.x, from.y, to.x, to.y, 'rgba(255,255,255,0.7)', true);
+      }
+    });
+  }
+}
+
+// ─────────────────────────────────────────────
+// MINI COURT (option cards)
+// ─────────────────────────────────────────────
+function createMiniCanvas(scenario, optionPlayers) {
+  const canvas = document.createElement('canvas');
+  const logW = 200, logH = 180;
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  canvas.width = Math.round(logW * dpr);
+  canvas.height = Math.round(logH * dpr);
+  canvas.className = 'option-mini-canvas';
+
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr);
+  const CW = logW, CH = logH;
+  const pad = 12, pr = 12;
+
+  drawCourt(ctx, CW, CH, pad);
+  drawShuttle(ctx, scenario.shuttle.tx, scenario.shuttle.ty, CW, CH, pad, 6);
+
+  scenario.players.forEach(init => {
+    const fin = optionPlayers.find(p => p.id === init.id);
+    if (!fin) return;
+    if (Math.abs(fin.x - init.x) > 0.02 || Math.abs(fin.y - init.y) > 0.02) {
+      const from = toCanvas(init.x, init.y, CW, CH, pad);
+      const to = toCanvas(fin.x, fin.y, CW, CH, pad);
+      drawArrow(ctx, from.x, from.y, to.x, to.y, 'rgba(255,255,255,0.55)', true);
+    }
+  });
+
+  optionPlayers.forEach(p => {
+    drawPlayer(ctx, p.x, p.y, p.id === 'p1' ? 'P1' : 'P2', playerColor(p.id), CW, CH, pad, pr);
+  });
+
+  return canvas;
+}
+
+// ─────────────────────────────────────────────
+// QUIZ FLOW
+// ─────────────────────────────────────────────
+function startQuiz() {
+  currentIdx = 0; score = 0; answered = false; results = [];
+  document.getElementById('score-disp').textContent = '0';
+  showScreen('quiz-screen');
+  renderScenario();
+}
+
+function renderScenario() {
+  const s = SCENARIOS[currentIdx];
+  answered = false;
+
+  document.getElementById('s-num').textContent = `시나리오 ${s.num} / 10`;
+  document.getElementById('s-title').textContent = s.title;
+  document.getElementById('s-situation').textContent = s.situation;
+  document.getElementById('s-formation').textContent = '📋 ' + s.formation;
+
+  // Progress
+  document.getElementById('progress-fill').style.width = (currentIdx / 10 * 100) + '%';
+
+  // Main court
+  renderMainCourt(s);
+
+  // Options
+  const grid = document.getElementById('options-grid');
+  grid.innerHTML = '';
+  s.options.forEach((opt, i) => {
+    const card = document.createElement('div');
+    card.className = 'option-card';
+    card.dataset.idx = i;
+
+    const badge = document.createElement('div');
+    badge.className = 'option-label-badge';
+    badge.textContent = opt.label;
+
+    const miniCanvas = createMiniCanvas(s, opt.players);
+
+    const desc = document.createElement('div');
+    desc.className = 'option-desc';
+    desc.textContent = opt.desc;
+
+    card.appendChild(badge);
+    card.appendChild(miniCanvas);
+    card.appendChild(desc);
+    card.addEventListener('click', () => selectOption(i));
+    grid.appendChild(card);
+  });
+
+  // Hide feedback
+  document.getElementById('feedback-panel').classList.add('hidden');
+}
+
+function selectOption(idx) {
+  if (answered) return;
+  answered = true;
+
+  const s = SCENARIOS[currentIdx];
+  const chosen = s.options[idx];
+  const isCorrect = chosen.correct;
+  if (isCorrect) score++;
+  results.push({ title: s.title, correct: isCorrect });
+  document.getElementById('score-disp').textContent = score;
+
+  // Style all cards
+  const cards = document.querySelectorAll('.option-card');
+  cards.forEach((card, i) => {
+    card.classList.add('disabled');
+    if (i === idx) {
+      card.classList.add(isCorrect ? 'selected-correct' : 'selected-wrong');
+    }
+    if (!isCorrect && s.options[i].correct) {
+      card.classList.add('show-correct');
+    }
+  });
+
+  // Animate main court to show correct rotation
+  const correctOpt = s.options.find(o => o.correct);
+  renderMainCourt(s, correctOpt.players.map((p, i) => ({
+    ...p,
+    label: s.players[i]?.label || (p.id === 'p1' ? 'P1' : 'P2')
+  })), 'result');
+
+  // Feedback panel
+  const fb = document.getElementById('feedback-panel');
+  fb.classList.remove('hidden');
+  document.getElementById('fb-icon').textContent = isCorrect ? '✅' : '❌';
+  const verdict = document.getElementById('fb-verdict');
+  verdict.textContent = isCorrect ? '정답입니다!' : '틀렸습니다!';
+  verdict.className = 'feedback-verdict ' + (isCorrect ? 'correct' : 'wrong');
+  document.getElementById('fb-explanation').innerHTML = s.explanation;
+
+  const nextBtn = document.getElementById('btn-next');
+  nextBtn.textContent = currentIdx < SCENARIOS.length - 1 ? '다음 문제 →' : '결과 보기 →';
+}
+
+function nextScenario() {
+  if (currentIdx < SCENARIOS.length - 1) {
+    currentIdx++;
+    renderScenario();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } else {
+    showResults();
+  }
+}
+
+function showResults() {
+  showScreen('results-screen');
+  document.getElementById('r-score').textContent = score;
+  document.getElementById('progress-fill').style.width = '100%';
+
+  // Conic gradient for score circle
+  const pct = (score / 10) * 100;
+  document.getElementById('score-circle').style.background =
+    `conic-gradient(var(--green) ${pct}%, var(--surface2) 0%)`;
+
+  const msgs = [
+    '더 연습해봐요! 기본기부터 차근차근! 💪',
+    '조금 더 힘내봐요! 1개 맞혔어요! 💪',
+    '계속 연습하면 늘어요! 2개 맞혔어요! 😊',
+    '로테이션 감각이 조금 보여요! 👍',
+    '절반이에요! 꽤 잘 하고 있어요! 👍',
+    '좋아요! 실전 감각이 있네요! 🌟',
+    '훌륭해요! 6/10, 기본기가 탄탄해요! 🌟',
+    '대단해요! 고급 로테이션도 이해하네요! 🔥',
+    '거의 마스터! 한 문제만 더! 🔥',
+    '한 문제 차이! 정말 잘 하셨어요! 🏆',
+    '만점! 복식 로테이션 완벽 마스터! 🏆'
+  ];
+  document.getElementById('r-message').textContent = msgs[score] || msgs[10];
+
+  const icons = ['😅','😅','😊','😊','👍','👍','🌟','🌟','🔥','🔥','🏆'];
+  document.getElementById('r-icon').textContent = icons[score] || '🏆';
+
+  const bd = document.getElementById('r-breakdown');
+  bd.innerHTML = '';
+  results.forEach((r, i) => {
+    const row = document.createElement('div');
+    row.className = 'result-row';
+    row.innerHTML = `
+      <span class="result-icon">${r.correct ? '✅' : '❌'}</span>
+      <span class="result-name">${i + 1}. ${r.title}</span>
+      <span class="result-status ${r.correct ? 'ok' : 'fail'}">${r.correct ? '정답' : '오답'}</span>
+    `;
+    bd.appendChild(row);
+  });
+}
+
+function restartQuiz() {
+  startQuiz();
+}
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// Re-render on iPad orientation change or window resize
+let _resizeTimer;
+window.addEventListener('resize', () => {
+  clearTimeout(_resizeTimer);
+  _resizeTimer = setTimeout(() => {
+    if (document.getElementById('quiz-screen').classList.contains('active') && !answered) {
+      renderMainCourt(SCENARIOS[currentIdx]);
+    } else if (document.getElementById('quiz-screen').classList.contains('active') && answered) {
+      const s = SCENARIOS[currentIdx];
+      const correctOpt = s.options.find(o => o.correct);
+      renderMainCourt(s, correctOpt.players.map((p, i) => ({
+        ...p, label: s.players[i]?.label || (p.id === 'p1' ? 'P1' : 'P2')
+      })), 'result');
+    }
+  }, 200);
+});
+
+window.addEventListener('orientationchange', () => {
+  setTimeout(() => {
+    if (document.getElementById('quiz-screen').classList.contains('active')) {
+      renderMainCourt(SCENARIOS[currentIdx]);
+    }
+  }, 350);
+});
+</script>
+</body>
+</html>
