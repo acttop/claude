@@ -243,6 +243,10 @@
         <span class="chip">④ 공격 전환</span>
         <span class="chip">⑤ 크로스 공격</span>
         <span class="chip">⑥ 왼쪽 코너 수비</span>
+        <span class="chip">⑦ 오른쪽 코너 수비</span>
+        <span class="chip">⑧ 로브 역할 교체</span>
+        <span class="chip">⑨ 오른쪽 드롭 처리</span>
+        <span class="chip">⑩ 직선 스매시 대형</span>
       </div>
       <div style="background:var(--surface);border-radius:var(--radius);padding:14px 18px;font-size:0.83rem;color:var(--muted);line-height:1.6;border:1px solid #1e293b;width:100%">
         <strong style="color:var(--text)">게임 방법</strong><br>
@@ -257,7 +261,7 @@
   <div id="quiz-screen" class="screen">
     <div class="quiz-header">
       <div class="progress-bar"><div id="progress-fill" class="progress-fill" style="width:0%"></div></div>
-      <div class="score-badge">점수 <span id="score-disp">0</span>/6</div>
+      <div class="score-badge">점수 <span id="score-disp">0</span>/10</div>
     </div>
     <div class="scenario-num" id="s-num"></div>
     <h2 class="scenario-title" id="s-title"></h2>
@@ -286,7 +290,7 @@
       <div class="score-circle" id="score-circle">
         <div class="score-circle-inner">
           <div class="score-num" id="r-score">0</div>
-          <div class="score-denom">/ 6</div>
+          <div class="score-denom">/ 10</div>
         </div>
       </div>
       <div class="score-message" id="r-message"></div>
@@ -427,6 +431,90 @@ const SCENARIOS = [
         players: [{ id:'p1', x:0.28, y:0.72 }, { id:'p2', x:0.1, y:0.92 }], correct: false }
     ],
     explanation: '왼쪽 코너 공은 <strong>왼쪽 담당 P1이 처리</strong>합니다. P1이 코너로 이동하면 중앙이 크게 비어버립니다. <strong>P2는 중앙-왼쪽으로 이동</strong>해 빈 공간을 메웁니다. P2가 오른쪽에 그대로 있으면 중앙이 비어 상대에게 쉬운 공격 기회를 줍니다!'
+  },
+  {
+    num: 7, title: '오른쪽 백코너 수비',
+    situation: '상대가 우리 오른쪽 백코너로 강한 스매시를 날렸습니다!',
+    formation: '수비 대형 (좌우 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.28, y: 0.72 },
+      { id: 'p2', label: 'P2', x: 0.72, y: 0.72 }
+    ],
+    shuttle: { fx: 0.78, fy: 0.15, tx: 0.92, ty: 0.90 },
+    options: [
+      { label: 'A', desc: 'P2가 오른쪽 코너로 후퇴,\nP1이 중앙-오른쪽으로 이동',
+        players: [{ id:'p1', x:0.52, y:0.72 }, { id:'p2', x:0.92, y:0.90 }], correct: true },
+      { label: 'B', desc: 'P1이 오른쪽 코너로\n달려가고, P2는 유지',
+        players: [{ id:'p1', x:0.92, y:0.90 }, { id:'p2', x:0.72, y:0.72 }], correct: false },
+      { label: 'C', desc: '두 선수 모두 오른쪽으로\n크게 이동 (왼쪽 노출)',
+        players: [{ id:'p1', x:0.65, y:0.72 }, { id:'p2', x:0.92, y:0.90 }], correct: false },
+      { label: 'D', desc: '현재 위치 유지,\n움직이지 않음',
+        players: [{ id:'p1', x:0.28, y:0.72 }, { id:'p2', x:0.72, y:0.72 }], correct: false }
+    ],
+    explanation: '오른쪽 코너 공은 <strong>오른쪽 담당 P2가 처리</strong>합니다. P2가 코너로 이동하면 중앙이 비어버립니다. <strong>P1은 중앙-오른쪽으로 이동</strong>해 빈 공간을 메웁니다. P1이 너무 오른쪽으로 이동하면 왼쪽 코트 전체가 비어버리니 주의하세요!'
+  },
+  {
+    num: 8, title: '로브 대응 - 역할 교체',
+    situation: '공격 대형 중 상대가 P1(앞선수) 머리 위로 높은 로브를 올렸습니다! P1이 뒤로 물러나야 합니다.',
+    formation: '공격 대형 → 역할 교체',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.50, y: 0.82 }
+    ],
+    shuttle: { fx: 0.42, fy: 0.35, tx: 0.22, ty: 0.88 },
+    options: [
+      { label: 'A', desc: 'P1이 왼쪽 뒤로 후퇴,\nP2가 네트 앞으로 전진',
+        players: [{ id:'p1', x:0.22, y:0.88 }, { id:'p2', x:0.50, y:0.60 }], correct: true },
+      { label: 'B', desc: 'P1이 왼쪽 뒤로 후퇴,\nP2도 뒤로 물러남',
+        players: [{ id:'p1', x:0.22, y:0.88 }, { id:'p2', x:0.60, y:0.82 }], correct: false },
+      { label: 'C', desc: 'P2가 왼쪽으로 달려가\n로브 처리, P1 네트 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.22, y:0.88 }], correct: false },
+      { label: 'D', desc: '두 선수 모두\n현재 위치 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.50, y:0.82 }], correct: false }
+    ],
+    explanation: '로브로 앞선수(P1)가 뒤로 밀리면 <strong>자연스럽게 역할이 교체</strong>됩니다. P1은 로브 위치로 후퇴하여 공을 처리하고, <strong>P2는 빠르게 네트 앞으로 올라가</strong> 공격 대형을 유지합니다. 뒷선수가 함께 뒤로 가면 두 선수 모두 뒤로 몰려 네트가 완전히 비어버립니다!'
+  },
+  {
+    num: 9, title: '오른쪽 네트 드롭 처리',
+    situation: '공격 대형 중 상대가 우리 오른쪽 네트 앞으로 드롭샷을 쳤습니다!',
+    formation: '공격 대형 (앞뒤 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.50, y: 0.82 }
+    ],
+    shuttle: { fx: 0.78, fy: 0.32, tx: 0.88, ty: 0.55 },
+    options: [
+      { label: 'A', desc: 'P1이 오른쪽 네트로\n달려가 처리, P2 오른쪽으로',
+        players: [{ id:'p1', x:0.88, y:0.55 }, { id:'p2', x:0.65, y:0.82 }], correct: true },
+      { label: 'B', desc: 'P2가 앞으로 달려가\n처리, P1은 뒤로',
+        players: [{ id:'p1', x:0.42, y:0.82 }, { id:'p2', x:0.88, y:0.55 }], correct: false },
+      { label: 'C', desc: 'P1이 오른쪽으로,\nP2도 함께 앞으로',
+        players: [{ id:'p1', x:0.88, y:0.55 }, { id:'p2', x:0.72, y:0.65 }], correct: false },
+      { label: 'D', desc: 'P1이 제자리에서\n팔을 뻗어 처리',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.50, y:0.82 }], correct: false }
+    ],
+    explanation: '앞뒤 대형에서 <strong>오른쪽 드롭은 앞선수(P1)가 달려가 처리</strong>합니다. P1이 오른쪽으로 이동하면 왼쪽 중앙이 비게 되므로 <strong>P2는 오른쪽으로 조금 이동</strong>해 빈 공간을 커버합니다. P2가 앞으로 오면 뒤가 비어 위험해집니다!'
+  },
+  {
+    num: 10, title: '직선 스매시 후 대형',
+    situation: 'P2가 백코트 중앙에서 상대 오른쪽(직선)으로 스매시를 쳤습니다! 이제 어떻게 포지셔닝해야 할까요?',
+    formation: '공격 대형 (앞뒤 나란히)',
+    players: [
+      { id: 'p1', label: 'P1', x: 0.42, y: 0.60 },
+      { id: 'p2', label: 'P2', x: 0.50, y: 0.82 }
+    ],
+    shuttle: { fx: 0.50, fy: 0.82, tx: 0.85, ty: 0.10 },
+    options: [
+      { label: 'A', desc: 'P2가 왼쪽으로 이동\n(크로스 리턴 대비), P1 네트 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.28, y:0.82 }], correct: true },
+      { label: 'B', desc: 'P2가 오른쪽으로 이동,\nP1도 오른쪽으로',
+        players: [{ id:'p1', x:0.65, y:0.60 }, { id:'p2', x:0.75, y:0.82 }], correct: false },
+      { label: 'C', desc: '두 선수 모두\n현재 위치 유지',
+        players: [{ id:'p1', x:0.42, y:0.60 }, { id:'p2', x:0.50, y:0.82 }], correct: false },
+      { label: 'D', desc: 'P1이 오른쪽 네트로,\nP2도 오른쪽으로',
+        players: [{ id:'p1', x:0.75, y:0.60 }, { id:'p2', x:0.75, y:0.82 }], correct: false }
+    ],
+    explanation: '직선 스매시(오른쪽) 후 <strong>우리 코트 왼쪽이 열립니다</strong>. 상대는 크로스(왼쪽)로 리턴할 가능성이 높으므로 <strong>P2는 왼쪽으로 이동</strong>해 크로스 리턴을 대비합니다. P1은 네트 중앙에서 직선 리턴을 차단합니다. 크로스 공격(5번)과 반대 방향임을 기억하세요!'
   }
 ];
 
@@ -725,13 +813,13 @@ function renderScenario() {
   const s = SCENARIOS[currentIdx];
   answered = false;
 
-  document.getElementById('s-num').textContent = `시나리오 ${s.num} / 6`;
+  document.getElementById('s-num').textContent = `시나리오 ${s.num} / 10`;
   document.getElementById('s-title').textContent = s.title;
   document.getElementById('s-situation').textContent = s.situation;
   document.getElementById('s-formation').textContent = '📋 ' + s.formation;
 
   // Progress
-  document.getElementById('progress-fill').style.width = (currentIdx / 6 * 100) + '%';
+  document.getElementById('progress-fill').style.width = (currentIdx / 10 * 100) + '%';
 
   // Main court
   renderMainCourt(s);
@@ -824,17 +912,27 @@ function showResults() {
   document.getElementById('progress-fill').style.width = '100%';
 
   // Conic gradient for score circle
-  const pct = (score / 6) * 100;
+  const pct = (score / 10) * 100;
   document.getElementById('score-circle').style.background =
     `conic-gradient(var(--green) ${pct}%, var(--surface2) 0%)`;
 
-  const msgs = ['더 연습해봐요! 기본기부터 차근차근 💪', '잘 하고 있어요! 조금만 더 연습하면! 😊',
-    '좋습니다! 로테이션 감각이 있네요! 👍', '훌륭해요! 실전 감각이 뛰어나네요! 🌟',
-    '거의 완벽! 한 문제만 더 맞히면! 🔥', '만점! 복식 로테이션 마스터! 🏆'];
-  document.getElementById('r-message').textContent = msgs[score] || msgs[5];
+  const msgs = [
+    '더 연습해봐요! 기본기부터 차근차근! 💪',
+    '조금 더 힘내봐요! 1개 맞혔어요! 💪',
+    '계속 연습하면 늘어요! 2개 맞혔어요! 😊',
+    '로테이션 감각이 조금 보여요! 👍',
+    '절반이에요! 꽤 잘 하고 있어요! 👍',
+    '좋아요! 실전 감각이 있네요! 🌟',
+    '훌륭해요! 6/10, 기본기가 탄탄해요! 🌟',
+    '대단해요! 고급 로테이션도 이해하네요! 🔥',
+    '거의 마스터! 한 문제만 더! 🔥',
+    '한 문제 차이! 정말 잘 하셨어요! 🏆',
+    '만점! 복식 로테이션 완벽 마스터! 🏆'
+  ];
+  document.getElementById('r-message').textContent = msgs[score] || msgs[10];
 
-  const r_icon_map = ['😅','😊','👍','🌟','🔥','🏆'];
-  document.getElementById('r-icon').textContent = score === 6 ? '🏆' : r_icon_map[score] || '🏆';
+  const icons = ['😅','😅','😊','😊','👍','👍','🌟','🌟','🔥','🔥','🏆'];
+  document.getElementById('r-icon').textContent = icons[score] || '🏆';
 
   const bd = document.getElementById('r-breakdown');
   bd.innerHTML = '';
