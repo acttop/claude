@@ -956,9 +956,23 @@ function ocrNum(s) {
   return m ? parseFloat(m[0].replace(/,/g, '')) : null;
 }
 
-// OCR 상품명 후처리: 끝에 붙는 노이즈 제거
+// OCR 상품명 후처리: 끝에 붙는 노이즈 제거 + 폰트 오인식 보정
 function cleanOcrName(name) {
   let s = name;
+  // 일부 증권앱 폰트에서 S→5, P→0 오인식 보정 ("미국5&0500" → "미국S&P500")
+  s = s.replace(/5(&|＆)0(\d+)/g, 'S$1P$2');
+  // 앞부분 깨진 노이즈 제거: 정상 ETF명 패턴(알파벳 대문자/숫자/한글 ETF 키워드) 이전에
+  // 특수문자·그리스문자·대괄호가 섞인 쓰레기가 있으면 제거
+  // 예: "미56π[062040액티브 적격" → 앞 쓰레기 제거 후 "062040액티브 적격"은 여전히 이상하므로
+  // 실제 ETF 키워드 앞 노이즈(특수문자 포함 구간)를 날림
+  s = s.replace(/^[^A-Za-z가-힣0-9]*(?=[A-Z가-힣])/, ''); // 맨 앞 특수문자 제거
+  // 이름 안에 특수문자([, π, ], < 등)가 포함된 경우 해당 특수문자까지 앞을 제거
+  const specialIdx = s.search(/[\[\]π<>{}|\\^~`@#$%*_]/);
+  if (specialIdx > 0 && specialIdx < s.length - 3) {
+    // 특수문자 뒤에 한글 ETF 키워드나 숫자가 있으면 그 앞 쓰레기 제거
+    const after = s.slice(specialIdx + 1);
+    if (/[가-힣A-Za-z0-9]/.test(after)) s = after.replace(/^[^A-Za-z가-힣0-9]*/, '');
+  }
   // 후미 소문자 한 글자 제거 ("적격 f" → "적격")
   s = s.replace(/\s+[a-z]$/i, m => /[A-Z]/.test(m) ? m : '');
   // 후미 한글 한 글자 괄호 제거 ("액티브(너)" → "액티브")
