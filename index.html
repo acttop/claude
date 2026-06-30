@@ -1,976 +1,1724 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="배드민턴전략">
-  <title>배드민턴 복식 전략보드</title>
-  <style>
-    * {
-      margin: 0; padding: 0; box-sizing: border-box;
-      -webkit-touch-callout: none;
-      -webkit-user-select: none;
-      user-select: none;
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="자산스캐너">
+<meta name="theme-color" content="#000000">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>자산 스캐너</title>
+<style>
+  :root {
+    --bg: #000;
+    --bg2: #1c1c1e;
+    --bg3: #2c2c2e;
+    --bg4: #3a3a3c;
+    --sep: #38383a;
+    --txt: #fff;
+    --txt2: #ebebf599;
+    --txt3: #ebebf54d;
+    --blue: #0a84ff;
+    --red: #ff453a;
+    --green: #30d158;
+    --yellow: #ffd60a;
+    --orange: #ff9f0a;
+    --purple: #bf5af2;
+    --tab-h: 83px;
+    --safe-top: env(safe-area-inset-top, 44px);
+    --safe-bot: env(safe-area-inset-bottom, 34px);
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f2f7;
+      --bg2: #fff;
+      --bg3: #f2f2f7;
+      --bg4: #e5e5ea;
+      --sep: #c6c6c8;
+      --txt: #000;
+      --txt2: #3c3c4399;
+      --txt3: #3c3c434d;
     }
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; background: var(--bg); color: var(--txt); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; overflow: hidden; }
 
-    html, body {
-      width: 100%; height: 100%;
-      background: #1a1a2e;
-      color: #e0e0e0;
-      font-family: -apple-system, 'Helvetica Neue', sans-serif;
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      /* Prevent Safari bounce scroll */
-      position: fixed;
-      top: 0; left: 0;
-    }
+  #app { display: flex; flex-direction: column; height: 100%; }
 
-    /* ── Header ─────────────────────────── */
-    #header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 12px;
-      padding-top: max(8px, env(safe-area-inset-top));
-      background: #16213e;
-      border-bottom: 2px solid #0f3460;
-      flex-shrink: 0;
-      gap: 8px;
-    }
+  /* ── SCREENS ── */
+  .screen { display: none; flex: 1; flex-direction: column; overflow: hidden; }
+  .screen.active { display: flex; }
 
-    #header h1 {
-      font-size: 1rem;
-      color: #e94560;
-      font-weight: 700;
-      white-space: nowrap;
-      flex-shrink: 0;
-    }
+  .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding-bottom: 16px; }
+  .scroll::-webkit-scrollbar { display: none; }
 
-    #toolbar {
-      display: flex;
-      gap: 5px;
-      align-items: center;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
-      flex: 1;
-      padding-bottom: 2px;
-    }
+  /* ── NAV BAR ── */
+  .nav-bar {
+    padding-top: var(--safe-top);
+    background: rgba(28,28,30,.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 0.5px solid var(--sep);
+    flex-shrink: 0;
+    z-index: 10;
+  }
+  @media (prefers-color-scheme: light) {
+    .nav-bar { background: rgba(242,242,247,.85); }
+  }
+  .nav-title { text-align: center; padding: 12px 60px; font-size: 17px; font-weight: 600; }
+  .nav-btn { position: absolute; top: calc(var(--safe-top) + 8px); font-size: 17px; color: var(--blue); background: none; border: none; cursor: pointer; padding: 4px 12px; }
+  .nav-btn.left { left: 0; }
+  .nav-btn.right { right: 0; }
 
-    #toolbar::-webkit-scrollbar { display: none; }
+  /* ── TAB BAR ── */
+  .tab-bar {
+    height: var(--tab-h);
+    padding-bottom: var(--safe-bot);
+    background: rgba(28,28,30,.85);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-top: 0.5px solid var(--sep);
+    display: flex;
+    align-items: flex-start;
+    flex-shrink: 0;
+  }
+  @media (prefers-color-scheme: light) {
+    .tab-bar { background: rgba(242,242,247,.85); }
+  }
+  .tab-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding-top: 10px; cursor: pointer; color: var(--txt3); font-size: 10px; border: none; background: none; }
+  .tab-item.active { color: var(--blue); }
+  .tab-item svg { width: 24px; height: 24px; }
 
-    .tool-group {
-      display: flex;
-      gap: 3px;
-      align-items: center;
-      background: #0f3460;
-      padding: 4px 8px;
-      border-radius: 8px;
-      flex-shrink: 0;
-    }
+  /* ── CARDS ── */
+  .card { background: var(--bg2); border-radius: 16px; margin: 8px 16px; overflow: hidden; }
+  .card-row { padding: 12px 16px; display: flex; justify-content: space-between; align-items: center; border-bottom: 0.5px solid var(--sep); }
+  .card-row:last-child { border-bottom: none; }
+  .card-section { padding: 8px 0; }
+  .section-header { padding: 6px 32px; font-size: 13px; color: var(--txt2); font-weight: 400; }
 
-    .tool-group label {
-      font-size: 0.65rem;
-      color: #a0a0c0;
-      margin-right: 2px;
-      white-space: nowrap;
-    }
+  /* ── SUMMARY CARD ── */
+  .summary-card { background: var(--bg2); border-radius: 20px; margin: 8px 16px; padding: 20px; }
+  .summary-total { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; }
+  .summary-sub { font-size: 13px; color: var(--txt2); margin-top: 2px; }
+  .summary-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 16px; }
+  .summary-cell { background: var(--bg3); border-radius: 12px; padding: 12px; }
+  .cell-label { font-size: 11px; color: var(--txt2); margin-bottom: 4px; }
+  .cell-value { font-size: 16px; font-weight: 600; }
+  .cell-pct { font-size: 12px; margin-top: 2px; }
 
-    button {
-      background: #0f3460;
-      color: #e0e0e0;
-      border: 1px solid #1a5276;
-      border-radius: 8px;
-      padding: 7px 11px;
-      cursor: pointer;
-      font-size: 0.78rem;
-      transition: background 0.12s;
-      white-space: nowrap;
-      /* iOS: prevent highlight flash */
-      -webkit-tap-highlight-color: transparent;
-      min-height: 36px;
-    }
+  .profit { color: #ff453a; }
+  .loss   { color: #0a84ff; }
+  .neutral { color: var(--txt2); }
 
-    button:active { background: #1a5276; }
-    button.active { background: #e94560; border-color: #e94560; color: #fff; }
+  /* ── CHART ── */
+  .chart-wrap { margin: 8px 16px; background: var(--bg2); border-radius: 16px; padding: 16px; }
+  .chart-title { font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+  canvas { width: 100%; border-radius: 8px; }
 
-    .color-btn {
-      width: 26px; height: 26px;
-      border-radius: 50%;
-      border: 3px solid transparent;
-      cursor: pointer; padding: 0;
-      flex-shrink: 0;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .color-btn.active { border-color: #fff; transform: scale(1.2); }
+  /* ── LIST ── */
+  .record-item { padding: 14px 16px; border-bottom: 0.5px solid var(--sep); cursor: pointer; active-opacity: 0.5; }
+  .record-item:last-child { border-bottom: none; }
+  .record-item:active { background: var(--bg3); }
+  .record-date { font-size: 15px; font-weight: 600; }
+  .record-meta { font-size: 13px; color: var(--txt2); margin-top: 2px; }
+  .record-values { text-align: right; }
 
-    /* ── Main ───────────────────────────── */
-    #main {
-      display: flex;
-      flex: 1;
-      overflow: hidden;
-      min-height: 0;
-    }
+  /* ── FORM ── */
+  .form-group { padding: 12px 16px; border-bottom: 0.5px solid var(--sep); display: flex; align-items: center; gap: 12px; }
+  .form-group:last-child { border-bottom: none; }
+  .form-label { font-size: 15px; min-width: 80px; flex-shrink: 0; }
+  .form-input { flex: 1; background: none; border: none; color: var(--txt); font-size: 15px; text-align: right; outline: none; font-family: inherit; }
+  .form-input::placeholder { color: var(--txt3); }
+  select.form-input { -webkit-appearance: none; }
 
-    #court-container {
-      flex: 1;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 8px;
-      overflow: hidden;
-      background: #111827;
-      min-width: 0;
-    }
+  /* ── BUTTONS ── */
+  .btn { border: none; border-radius: 12px; font-size: 16px; font-weight: 600; padding: 14px; width: 100%; cursor: pointer; font-family: inherit; }
+  .btn-primary { background: var(--blue); color: #fff; }
+  .btn-danger  { background: var(--red);  color: #fff; }
+  .btn-secondary { background: var(--bg3); color: var(--txt); }
+  .btn-wrap { padding: 12px 16px; }
+  .btn:active { opacity: 0.8; }
 
-    canvas {
-      border-radius: 6px;
-      display: block;
-      box-shadow: 0 0 30px rgba(0,0,0,0.6);
-      /* Prevent browser handling touch on canvas */
-      touch-action: none;
-    }
+  /* ── REBALANCING ── */
+  .rebal-bar-wrap { height: 6px; background: var(--bg4); border-radius: 3px; overflow: hidden; }
+  .rebal-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
 
-    /* ── Sidebar ────────────────────────── */
-    #sidebar {
-      width: 200px;
-      min-width: 200px;
-      background: #16213e;
-      border-left: 2px solid #0f3460;
-      display: flex;
-      flex-direction: column;
-      padding: 8px;
-      gap: 7px;
-      flex-shrink: 0;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch;
-      padding-bottom: max(8px, env(safe-area-inset-bottom));
-    }
+  .badge { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; }
+  .badge-buy { background: rgba(255,69,58,.15); color: var(--red); }
+  .badge-ok  { background: rgba(48,209,88,.15);  color: var(--green); }
+  .badge-over { background: rgba(10,132,255,.15); color: var(--blue); }
 
-    #sidebar::-webkit-scrollbar { width: 3px; }
-    #sidebar::-webkit-scrollbar-thumb { background: #0f3460; border-radius: 2px; }
+  /* ── SETTINGS ── */
+  .setting-toggle { position: relative; width: 51px; height: 31px; flex-shrink: 0; }
+  .toggle-input { opacity: 0; width: 0; height: 0; position: absolute; }
+  .toggle-slider {
+    position: absolute; inset: 0; background: var(--bg4); border-radius: 31px; cursor: pointer;
+    transition: background .2s;
+  }
+  .toggle-slider::before {
+    content: ''; position: absolute; height: 27px; width: 27px; left: 2px; bottom: 2px;
+    background: white; border-radius: 50%; transition: transform .2s;
+    box-shadow: 0 2px 4px rgba(0,0,0,.3);
+  }
+  .toggle-input:checked + .toggle-slider { background: var(--green); }
+  .toggle-input:checked + .toggle-slider::before { transform: translateX(20px); }
 
-    .sidebar-section {
-      background: #0f3460;
-      border-radius: 8px;
-      padding: 8px;
-      flex-shrink: 0;
-    }
+  /* ── MODAL ── */
+  .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 100; display: none; align-items: flex-end; }
+  .modal-overlay.open { display: flex; }
+  .modal-sheet { background: var(--bg2); border-radius: 20px 20px 0 0; width: 100%; max-height: 90vh; overflow-y: auto; padding-bottom: var(--safe-bot); }
+  .modal-handle { width: 36px; height: 5px; background: var(--bg4); border-radius: 3px; margin: 10px auto 16px; }
+  .modal-title { font-size: 17px; font-weight: 700; padding: 0 20px 16px; }
 
-    .sidebar-section h3 {
-      font-size: 0.68rem;
-      color: #e94560;
-      margin-bottom: 6px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
+  /* ── ASSET DETAIL ── */
+  .asset-row { display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 0.5px solid var(--sep); }
+  .asset-row:last-child { border-bottom: none; }
+  .asset-name { font-size: 15px; font-weight: 500; }
+  .asset-sym  { font-size: 12px; color: var(--txt2); margin-top: 1px; }
+  .asset-right { text-align: right; }
 
-    /* ── Player tokens ──────────────────── */
-    .player-token {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 7px 8px;
-      border-radius: 8px;
-      margin-bottom: 4px;
-      background: #1a4a7a;
-      border: 1px solid #2a6aaa;
-      cursor: pointer;
-      transition: background 0.1s, transform 0.1s;
-      -webkit-tap-highlight-color: transparent;
-    }
+  /* ── RATE BANNER ── */
+  .rate-banner { margin: 0 16px 4px; background: var(--bg2); border-radius: 12px; padding: 10px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .rate-val { font-size: 18px; font-weight: 700; }
+  .rate-time { font-size: 11px; color: var(--txt2); }
 
-    .player-token.selected {
-      background: #1e6eb0;
-      border-color: #4db8ff;
-      transform: scale(1.02);
-    }
+  /* ── EMPTY STATE ── */
+  .empty { text-align: center; padding: 60px 20px; color: var(--txt2); }
+  .empty-icon { font-size: 48px; margin-bottom: 12px; }
+  .empty-title { font-size: 20px; font-weight: 600; color: var(--txt); margin-bottom: 8px; }
+  .empty-desc { font-size: 14px; line-height: 1.5; }
 
-    .player-token:active { background: #1e5a8a; }
+  /* ── CAMERA ── */
+  #camera-input { display: none; }
+  #scan-img-el { display: block; }
 
-    .token-circle {
-      width: 30px; height: 30px;
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-weight: bold;
-      font-size: 0.8rem;
-      flex-shrink: 0;
-      border: 2px solid rgba(255,255,255,0.4);
-    }
+  /* ── TOAST ── */
+  .toast { position: fixed; bottom: calc(var(--tab-h) + 16px); left: 50%; transform: translateX(-50%); background: rgba(50,50,50,.95); color: #fff; padding: 10px 20px; border-radius: 20px; font-size: 14px; z-index: 200; opacity: 0; transition: opacity .3s; white-space: nowrap; }
+  .toast.show { opacity: 1; }
 
-    .token-label { font-size: 0.72rem; flex: 1; }
-    .token-hint  { font-size: 0.6rem; color: #6090b0; margin-top: 1px; }
+  /* ── WEIGHT BAR ── */
+  .weight-pill { display: inline-block; height: 8px; border-radius: 4px; }
 
-    #place-hint {
-      background: rgba(78,205,196,0.15);
-      border: 1px solid #4ecdc4;
-      border-radius: 6px;
-      padding: 5px 7px;
-      font-size: 0.68rem;
-      color: #4ecdc4;
-      text-align: center;
-      display: none;
-    }
+  /* Pull-to-refresh simulation */
+  .ptr-indicator { text-align: center; padding: 12px; font-size: 13px; color: var(--txt2); }
 
-    /* ── Score ──────────────────────────── */
-    .score-row { display: flex; justify-content: space-around; align-items: center; }
-    .score-team { text-align: center; }
-    .score-team .team-name { font-size: 0.62rem; color: #a0b0c0; margin-bottom: 2px; }
-    .score-team .score-num { font-size: 1.6rem; font-weight: bold; }
-    .score-team .score-num.team-a { color: #e94560; }
-    .score-team .score-num.team-b { color: #00d4ff; }
-
-    .score-controls { display: flex; flex-direction: column; gap: 3px; margin-top: 3px; }
-    .score-controls button { padding: 4px 10px; font-size: 0.72rem; min-height: 32px; }
-
-    #shuttle-indicator {
-      width: 28px; height: 28px;
-      border-radius: 50%;
-      background: rgba(255,255,255,0.1);
-      margin: 0 auto;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 1rem;
-      cursor: pointer;
-      border: 2px solid #e94560;
-      transition: border-color 0.2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-
-    .sep { height: 1px; background: rgba(255,255,255,0.06); margin: 4px 0; }
-
-    #formation-btns { display: flex; flex-direction: column; gap: 4px; }
-    #formation-btns button { width: 100%; text-align: left; font-size: 0.72rem; padding: 7px 8px; }
-
-    .strategy-notes {
-      width: 100%;
-      background: #1a2a4a;
-      border: 1px solid #2a4a7a;
-      color: #e0e0e0;
-      border-radius: 6px;
-      padding: 7px;
-      font-size: 0.75rem;
-      resize: none;
-      height: 70px;
-      -webkit-user-select: text;
-      user-select: text;
-    }
-
-    .legend { display: flex; flex-direction: column; gap: 4px; }
-    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 0.67rem; color: #a0b0c0; }
-    .legend-color { width: 20px; height: 3px; border-radius: 2px; }
-
-    /* ── Touch ghost (sidebar drag) ─────── */
-    #drag-ghost {
-      position: fixed;
-      pointer-events: none;
-      z-index: 9999;
-      width: 44px; height: 44px;
-      border-radius: 50%;
-      border: 3px solid #fff;
-      display: flex; align-items: center; justify-content: center;
-      font-weight: bold; font-size: 0.85rem;
-      transform: translate(-50%, -50%);
-      opacity: 0.88;
-      box-shadow: 0 4px 14px rgba(0,0,0,0.5);
-      display: none;
-    }
-  </style>
+  input[type=number] { -moz-appearance: textfield; }
+  input[type=number]::-webkit-outer-spin-button,
+  input[type=number]::-webkit-inner-spin-button { -webkit-appearance: none; }
+</style>
 </head>
 <body>
+<div id="app">
 
-<div id="header">
-  <h1>🏸 배드민턴 전략보드</h1>
-  <div id="toolbar">
-    <div class="tool-group">
-      <label>도구</label>
-      <button id="btn-move"   class="active" onclick="setTool('move')">✋ 이동</button>
-      <button id="btn-arrow"  onclick="setTool('arrow')">➡ 화살표</button>
-      <button id="btn-draw"   onclick="setTool('draw')">✏ 자유선</button>
-      <button id="btn-shuttle"onclick="setTool('shuttle')">🏸 셔틀</button>
-      <button id="btn-erase"  onclick="setTool('erase')">🗑 지우개</button>
+  <!-- ===== DASHBOARD SCREEN ===== -->
+  <div class="screen active" id="screen-dashboard">
+    <div class="nav-bar" style="position:relative">
+      <div class="nav-title">대시보드</div>
+      <button class="nav-btn right" onclick="openScanModal()">＋</button>
     </div>
-    <div class="tool-group">
-      <label>색상</label>
-      <button class="color-btn active" style="background:#ffdd57" onclick="setColor('#ffdd57')"></button>
-      <button class="color-btn" style="background:#ff6b6b" onclick="setColor('#ff6b6b')"></button>
-      <button class="color-btn" style="background:#4ecdc4" onclick="setColor('#4ecdc4')"></button>
-      <button class="color-btn" style="background:#a29bfe" onclick="setColor('#a29bfe')"></button>
-      <button class="color-btn" style="background:#ffffff" onclick="setColor('#ffffff')"></button>
+    <div class="scroll" id="dash-scroll">
+      <div id="dash-content"></div>
     </div>
-    <div class="tool-group">
-      <label>굵기</label>
-      <button id="w2" onclick="setWidth(2)">얇</button>
-      <button id="w4" class="active" onclick="setWidth(4)">중</button>
-      <button id="w7" onclick="setWidth(7)">굵</button>
+  </div>
+
+  <!-- ===== RECORDS SCREEN ===== -->
+  <div class="screen" id="screen-records">
+    <div class="nav-bar" style="position:relative">
+      <div class="nav-title">기록</div>
+      <button class="nav-btn right" onclick="openScanModal()">＋</button>
     </div>
-    <button onclick="undoLast()" style="background:#2c3e50">↩ 되돌리기</button>
-    <button onclick="clearDrawings()" style="background:#922b21">🗑 전체삭제</button>
-    <button onclick="resetPlayers()" style="background:#1e8449">🔄 초기화</button>
+    <div class="scroll">
+      <div id="records-list"></div>
+    </div>
+  </div>
+
+  <!-- ===== REBALANCING SCREEN ===== -->
+  <div class="screen" id="screen-rebal">
+    <div class="nav-bar" style="position:relative">
+      <div class="nav-title">리밸런싱</div>
+    </div>
+    <div class="scroll">
+      <div id="rebal-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== SETTINGS SCREEN ===== -->
+  <div class="screen" id="screen-settings">
+    <div class="nav-bar">
+      <div class="nav-title">설정</div>
+    </div>
+    <div class="scroll">
+      <div id="settings-content"></div>
+    </div>
+  </div>
+
+  <!-- ===== TAB BAR ===== -->
+  <nav class="tab-bar">
+    <button class="tab-item active" onclick="switchTab('dashboard',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+      대시보드
+    </button>
+    <button class="tab-item" onclick="switchTab('records',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zM6 4h6v6h6v10H6V4z"/></svg>
+      기록
+    </button>
+    <button class="tab-item" onclick="switchTab('rebal',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M17 12h-5v5h5v-5zM16 1v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2h-1V1h-2zm3 18H5V8h14v11z"/></svg>
+      리밸런싱
+    </button>
+    <button class="tab-item" onclick="switchTab('settings',this)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 15.5A3.5 3.5 0 018.5 12 3.5 3.5 0 0112 8.5a3.5 3.5 0 013.5 3.5 3.5 3.5 0 01-3.5 3.5m7.43-2.92c.04-.34.07-.68.07-1.08 0-.4-.03-.74-.07-1.08l2.33-1.82c.21-.16.27-.45.14-.69l-2.2-3.82c-.13-.24-.41-.32-.65-.24l-2.75 1.1c-.57-.44-1.18-.79-1.85-1.06L14.5 2.42c-.04-.26-.27-.42-.5-.42h-4c-.23 0-.46.16-.5.42L9.17 5.09c-.67.27-1.28.62-1.85 1.06L4.57 5.05c-.24-.08-.52 0-.65.24l-2.2 3.82c-.14.24-.08.53.14.69l2.33 1.82c-.04.34-.07.69-.07 1.08s.03.74.07 1.08L1.86 15.6c-.22.16-.28.45-.14.69l2.2 3.82c.13.24.41.32.65.24l2.75-1.1c.57.44 1.18.79 1.85 1.06l.41 2.67c.04.26.27.42.5.42h4c.23 0 .46-.16.5-.42l.41-2.67c.67-.27 1.28-.62 1.85-1.06l2.75 1.1c.24.08.52 0 .65-.24l2.2-3.82c.14-.24.08-.53-.14-.69l-2.33-1.82z"/></svg>
+      설정
+    </button>
+  </nav>
+</div>
+
+<!-- ===== MODALS ===== -->
+
+<!-- Scan Modal -->
+<div class="modal-overlay" id="scan-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">자산 기록 추가</div>
+    <div class="card">
+      <div class="form-group">
+        <span class="form-label">날짜</span>
+        <input class="form-input" type="date" id="scan-date">
+      </div>
+    </div>
+    <div id="scan-img-preview" style="display:none;margin:0 16px 4px;position:relative">
+      <img id="scan-img-el" style="width:100%;border-radius:12px;max-height:220px;object-fit:contain;background:#000" src="">
+      <button onclick="clearScanImage()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border:none;color:#fff;border-radius:50%;width:28px;height:28px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>
+    </div>
+    <div id="ocr-status" style="display:none;margin:4px 16px;padding:10px 14px;background:var(--bg3);border-radius:10px;font-size:13px;color:var(--txt2);text-align:center"></div>
+    <div id="ocr-summary" style="display:none;margin:4px 16px;padding:10px 14px;background:var(--bg3);border-radius:10px;font-size:12px;line-height:1.7"></div>
+    <div class="section-header" style="margin-top:8px">보유 자산</div>
+    <div class="card" id="scan-assets-list"></div>
+    <div class="btn-wrap" style="display:flex;gap:8px">
+      <button class="btn btn-secondary" style="width:auto;padding:14px 20px" onclick="addScanAssetRow()">＋ 종목 추가</button>
+      <button class="btn btn-primary" onclick="captureScan()">
+        <span>🖼️</span> 캡처 사진 선택
+      </button>
+    </div>
+    <div class="btn-wrap" style="padding-top:0">
+      <button class="btn btn-primary" onclick="saveScanRecord()">저장</button>
+    </div>
+    <div class="btn-wrap" style="padding-top:0">
+      <button class="btn btn-secondary" onclick="closeModal('scan-modal')">취소</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="camera-input" accept="image/*" onchange="processImage(event)">
+
+<!-- Record Detail Modal -->
+<div class="modal-overlay" id="detail-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div style="display:flex;align-items:center;padding:0 20px 16px;gap:8px">
+      <div id="detail-title" style="font-size:17px;font-weight:700;flex:1"></div>
+      <button id="detail-edit-btn" style="background:var(--blue);color:#fff;border:none;border-radius:10px;padding:6px 16px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit">수정</button>
+    </div>
+    <div id="detail-content"></div>
+    <div class="btn-wrap" style="display:flex;gap:8px">
+      <button class="btn btn-danger" id="detail-delete-btn" style="flex:1">삭제</button>
+      <button class="btn btn-secondary" onclick="closeModal('detail-modal')" style="flex:1">닫기</button>
+    </div>
   </div>
 </div>
 
-<div id="main">
-  <div id="court-container">
-    <canvas id="court"></canvas>
-  </div>
-
-  <div id="sidebar">
-
-    <div class="sidebar-section">
-      <h3>점수판</h3>
-      <div class="score-row">
-        <div class="score-team">
-          <div class="team-name">팀 A</div>
-          <div class="score-num team-a" id="score-a">0</div>
-          <div class="score-controls">
-            <button onclick="addScore('a',1)">+1</button>
-            <button onclick="addScore('a',-1)">-1</button>
-          </div>
-        </div>
-        <div style="text-align:center">
-          <div id="shuttle-indicator" onclick="toggleServe()">🏸</div>
-          <div style="font-size:0.58rem;color:#a0b0c0;margin-top:2px">서브</div>
-        </div>
-        <div class="score-team">
-          <div class="team-name">팀 B</div>
-          <div class="score-num team-b" id="score-b">0</div>
-          <div class="score-controls">
-            <button onclick="addScore('b',1)">+1</button>
-            <button onclick="addScore('b',-1)">-1</button>
-          </div>
-        </div>
+<!-- Add Portfolio Asset Modal -->
+<div class="modal-overlay" id="add-asset-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="add-asset-title">ETF 추가</div>
+    <div class="card">
+      <div class="form-group">
+        <span class="form-label">종목명</span>
+        <input class="form-input" type="text" id="pa-name" placeholder="TIGER 미국S&P500">
       </div>
-      <div class="sep"></div>
-      <button onclick="resetScores()" style="width:100%;font-size:0.7rem">점수 초기화</button>
-    </div>
-
-    <div class="sidebar-section">
-      <h3>선수 배치</h3>
-      <div id="place-hint">코트를 터치하여 배치</div>
-      <div class="player-token" data-player="A1" id="tok-A1">
-        <div class="token-circle" style="background:#e94560;color:#fff">A1</div>
-        <div><div class="token-label">팀A 선수 1</div><div class="token-hint">길게 눌러 드래그</div></div>
+      <div class="form-group">
+        <span class="form-label">심볼</span>
+        <input class="form-input" type="text" id="pa-symbol" placeholder="379800">
       </div>
-      <div class="player-token" data-player="A2" id="tok-A2">
-        <div class="token-circle" style="background:#ff8fab;color:#fff">A2</div>
-        <div><div class="token-label">팀A 선수 2</div><div class="token-hint">길게 눌러 드래그</div></div>
+      <div class="form-group">
+        <span class="form-label">통화</span>
+        <select class="form-input" id="pa-currency">
+          <option value="KRW">KRW</option>
+          <option value="USD">USD</option>
+        </select>
       </div>
-      <div class="player-token" data-player="B1" id="tok-B1">
-        <div class="token-circle" style="background:#00d4ff;color:#000">B1</div>
-        <div><div class="token-label">팀B 선수 1</div><div class="token-hint">길게 눌러 드래그</div></div>
+      <div class="form-group">
+        <span class="form-label">목표 비중 %</span>
+        <input class="form-input" type="number" id="pa-target" placeholder="20" min="0" max="100">
       </div>
-      <div class="player-token" data-player="B2" id="tok-B2">
-        <div class="token-circle" style="background:#4ecdc4;color:#000">B2</div>
-        <div><div class="token-label">팀B 선수 2</div><div class="token-hint">길게 눌러 드래그</div></div>
+      <div class="form-group">
+        <span class="form-label">현재가</span>
+        <input class="form-input" type="number" id="pa-price" placeholder="16800">
+      </div>
+      <div class="form-group">
+        <span class="form-label">보유수량</span>
+        <input class="form-input" type="number" id="pa-qty" placeholder="100">
+      </div>
+      <div class="form-group">
+        <span class="form-label">카테고리</span>
+        <input class="form-input" type="text" id="pa-cat" placeholder="해외주식">
       </div>
     </div>
-
-    <div class="sidebar-section">
-      <h3>포메이션</h3>
-      <div id="formation-btns">
-        <button onclick="setFormation('front-back')">↕ 전후 포메이션</button>
-        <button onclick="setFormation('side-by-side')">↔ 좌우 포메이션</button>
-        <button onclick="setFormation('attack')">⚔ 공격 대형</button>
-        <button onclick="setFormation('defense')">🛡 수비 대형</button>
-        <button onclick="setFormation('rotate')">🔃 로테이션</button>
-      </div>
+    <div class="btn-wrap">
+      <button class="btn btn-primary" id="pa-save-btn" onclick="savePortfolioAsset()">추가</button>
     </div>
-
-    <div class="sidebar-section">
-      <h3>범례</h3>
-      <div class="legend">
-        <div class="legend-item"><div class="legend-color" style="background:#e94560"></div>팀 A 코트</div>
-        <div class="legend-item"><div class="legend-color" style="background:#00d4ff"></div>팀 B 코트</div>
-        <div class="legend-item"><div class="legend-color" style="background:#ffdd57"></div>이동 경로</div>
-        <div class="legend-item"><div class="legend-color" style="background:#4ecdc4"></div>셔틀 궤적</div>
-      </div>
+    <div class="btn-wrap" style="padding-top:0">
+      <button class="btn btn-secondary" onclick="closeModal('add-asset-modal')">취소</button>
     </div>
-
-    <div class="sidebar-section">
-      <h3>전략 메모</h3>
-      <textarea class="strategy-notes" placeholder="전략 메모&#10;예) 서비스 후 네트 전진"></textarea>
-    </div>
-
   </div>
 </div>
 
-<!-- Touch ghost for sidebar drag -->
-<div id="drag-ghost"></div>
+<!-- Rebalancing Calc Modal -->
+<div class="modal-overlay" id="calc-modal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title">리밸런싱 계산</div>
+    <div class="card">
+      <div class="form-group">
+        <span class="form-label">추가 투자금</span>
+        <input class="form-input" type="number" id="calc-amount" placeholder="1000000">
+        <span style="font-size:14px;color:var(--txt2);margin-left:4px">원</span>
+      </div>
+    </div>
+    <div class="btn-wrap">
+      <button class="btn btn-primary" onclick="runRebalCalc()">계산하기</button>
+    </div>
+    <div id="calc-results"></div>
+    <div class="btn-wrap">
+      <button class="btn btn-secondary" onclick="closeModal('calc-modal')">닫기</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
 
 <script>
-const canvas = document.getElementById('court');
-const ctx    = canvas.getContext('2d');
-const ghost  = document.getElementById('drag-ghost');
-
-let tool      = 'move';
-let drawColor = '#ffdd57';
-let drawWidth = 4;
-let drawings  = [];
-let isDrawing = false;
-let drawStart = null;
-let currentPath = [];
-let dragPlayer  = null;   // player being dragged ON canvas
-let dragOffset  = { x: 0, y: 0 };
-let serveTeam   = 'a';
-let scores      = { a: 0, b: 0 };
-
-// sidebar touch-drag state
-let sidebarDragPlayer = null;  // player key being dragged FROM sidebar
-let selectedToken     = null;  // tap-to-select state
-
-let courtW, courtH, offX, offY;
-
-const PLAYERS = {
-  A1: { x: 0.25, y: 0.25, color: '#e94560', textColor: '#fff', label: 'A1' },
-  A2: { x: 0.25, y: 0.75, color: '#ff8fab', textColor: '#fff', label: 'A2' },
-  B1: { x: 0.75, y: 0.25, color: '#00d4ff', textColor: '#000', label: 'B1' },
-  B2: { x: 0.75, y: 0.75, color: '#4ecdc4', textColor: '#000', label: 'B2' },
+// ═══════════════════════════════════════════
+//  DATA LAYER
+// ═══════════════════════════════════════════
+const LS = {
+  get: (k, def) => { try { return JSON.parse(localStorage.getItem(k)) ?? def; } catch { return def; } },
+  set: (k, v) => localStorage.setItem(k, JSON.stringify(v))
 };
 
-const SHUTTLE = { x: 0.5, y: 0.5 };
-
-// ── Layout ────────────────────────────────────────────────
-function resize() {
-  const cont = document.getElementById('court-container');
-  const W = cont.clientWidth  - 16;
-  const H = cont.clientHeight - 16;
-  const ratio = 13.4 / 6.1;
-  let cw, ch;
-  if (W / H > ratio) { ch = H; cw = ch * ratio; }
-  else               { cw = W; ch = cw / ratio; }
-  canvas.width  = cw;
-  canvas.height = ch;
-  const mx = cw * 0.045, my = ch * 0.05;
-  offX = mx; offY = my;
-  courtW = cw - mx * 2;
-  courtH = ch - my * 2;
-  draw();
+// 자산 스키마: 상품명(name) / 매입금액(buyAmount) / 보유수량(qty) / 매입단가(avgPrice) / 평가금액(evalAmount)
+// 구버전 데이터({price} 기반)는 로드 시 자동 변환
+function migrateAsset(a) {
+  if (a.buyAmount !== undefined && a.evalAmount !== undefined) return a;
+  return {
+    name: a.name, symbol: a.symbol || '',
+    qty: a.qty || 0, avgPrice: a.avgPrice || 0,
+    buyAmount: a.buyAmount ?? Math.round((a.qty || 0) * (a.avgPrice || 0)),
+    evalAmount: a.evalAmount ?? Math.round((a.qty || 0) * (a.price || 0))
+  };
 }
 
-function c2s(cx, cy) { return { x: offX + cx * courtW, y: offY + cy * courtH }; }
-function s2c(x,  y)  { return { cx: (x - offX) / courtW, cy: (y - offY) / courtH }; }
+let scanRecords = LS.get('scanRecords', []).map(r => ({ ...r, assets: (r.assets || []).map(migrateAsset) }));
+let portfolio   = LS.get('portfolio', { name: '연금 포트폴리오', assets: [] });
+let settings    = LS.get('settings', { alertEnabled: false, alertThreshold: 1300, darkMode: 'auto', targetWeights: {} });
+let usdKrw      = 0;
+let usdKrwTime  = null;
+let editingAssetId = null;
+let editingRecordId = null;
 
-// ── Draw ──────────────────────────────────────────────────
-function draw() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawCourt();
-  drawings.forEach(renderItem);
-  drawPlayers();
-  drawShuttle();
+function save() {
+  LS.set('scanRecords', scanRecords);
+  LS.set('portfolio', portfolio);
 }
 
-function drawCourt() {
-  const grad = ctx.createLinearGradient(offX, offY, offX, offY + courtH);
-  grad.addColorStop(0, '#1b7a3e');
-  grad.addColorStop(1, '#145c30');
-  ctx.fillStyle = grad;
+// ─ Sorted records (newest first)
+function sortedRecords() {
+  return [...scanRecords].sort((a,b) => new Date(b.date) - new Date(a.date));
+}
+
+// ─ P&L helpers
+function dailyPnL(record) {
+  const sorted = sortedRecords();
+  const idx = sorted.findIndex(r => r.id === record.id);
+  if (idx < 0 || idx === sorted.length - 1) return 0;
+  const prev = sorted[idx + 1];
+  return record.totalValue - prev.totalValue;
+}
+
+function totalValue(record) {
+  return (record.assets || []).reduce((s, a) => s + (a.evalAmount || 0), 0);
+}
+function totalInvestment(record) {
+  return (record.assets || []).reduce((s, a) => s + (a.buyAmount || 0), 0);
+}
+
+// Attach computed totals
+function enrich(records) {
+  return records.map(r => ({
+    ...r,
+    totalValue: totalValue(r),
+    totalInvestment: totalInvestment(r),
+    get totalPnL() { return this.totalValue - this.totalInvestment; },
+    get totalPnLPct() { return this.totalInvestment > 0 ? (this.totalPnL / this.totalInvestment) * 100 : 0; }
+  }));
+}
+
+// ═══════════════════════════════════════════
+//  FORMAT HELPERS
+// ═══════════════════════════════════════════
+function fmt(n, digits=0) {
+  if (Math.abs(n) >= 1e8) return (n/1e8).toFixed(1) + '억원';
+  if (Math.abs(n) >= 1e4) return (n/1e4).toFixed(0) + '만원';
+  return n.toLocaleString('ko-KR', {maximumFractionDigits: digits}) + '원';
+}
+function fmtFull(n) {
+  return n.toLocaleString('ko-KR', {maximumFractionDigits: 0}) + '원';
+}
+function sign(n) { return n >= 0 ? '+' : ''; }
+function cls(n)  { return n > 0 ? 'profit' : n < 0 ? 'loss' : 'neutral'; }
+function fmtDate(d) {
+  const dt = new Date(d);
+  return dt.toLocaleDateString('ko-KR', {month:'long', day:'numeric', weekday:'short'});
+}
+function fmtDateShort(d) {
+  const dt = new Date(d);
+  return dt.toLocaleDateString('ko-KR', {month:'2-digit', day:'2-digit'});
+}
+function uuid() { return crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36); }
+
+// ═══════════════════════════════════════════
+//  TAB NAVIGATION
+// ═══════════════════════════════════════════
+function switchTab(name, el) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab-item').forEach(t => t.classList.remove('active'));
+  document.getElementById('screen-' + name).classList.add('active');
+  el.classList.add('active');
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'records')   renderRecords();
+  if (name === 'rebal')     renderRebal();
+  if (name === 'settings')  renderSettings();
+}
+
+// ═══════════════════════════════════════════
+//  DASHBOARD
+// ═══════════════════════════════════════════
+function renderDashboard() {
+  const sorted = enrich(sortedRecords());
+  const latest = sorted[0];
+  const el = document.getElementById('dash-content');
+
+  if (!latest) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📊</div><div class="empty-title">기록이 없습니다</div><div class="empty-desc">우측 상단 ＋ 버튼으로<br>첫 자산 기록을 추가해보세요</div></div>`;
+    return;
+  }
+
+  const daily = dailyPnL(latest);
+  const dailyPct = latest.totalValue > 0 && sorted[1] ? (daily / sorted[1].totalValue) * 100 : 0;
+  const cumPnL  = latest.totalPnL;
+  const cumPct  = latest.totalPnLPct;
+
+  let html = `
+    <div style="height:8px"></div>
+    <div class="summary-card">
+      <div style="font-size:12px;color:var(--txt2);margin-bottom:4px">총 평가금액</div>
+      <div class="summary-total">${fmtFull(latest.totalValue)}</div>
+      <div class="summary-sub">투자원금 ${fmtFull(latest.totalInvestment)}</div>
+      <div class="summary-grid">
+        <div class="summary-cell">
+          <div class="cell-label">일별 손익</div>
+          <div class="cell-value ${cls(daily)}">${sign(daily)}${fmt(daily)}</div>
+          <div class="cell-pct ${cls(daily)}">${sign(dailyPct)}${dailyPct.toFixed(2)}%</div>
+        </div>
+        <div class="summary-cell">
+          <div class="cell-label">누적 손익</div>
+          <div class="cell-value ${cls(cumPnL)}">${sign(cumPnL)}${fmt(cumPnL)}</div>
+          <div class="cell-pct ${cls(cumPct)}">${sign(cumPct)}${cumPct.toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>`;
+
+  // Mini chart
+  if (sorted.length > 1) {
+    html += `<div class="chart-wrap"><div class="chart-title">누적 손익 추이</div><canvas id="pnl-chart" height="120"></canvas></div>`;
+  }
+
+  // Latest holdings
+  html += `<div class="section-header">보유 종목 (${fmtDate(latest.date)})</div><div class="card">`;
+  (latest.assets || []).forEach(a => {
+    const val = a.evalAmount || 0;
+    const pnl = val - (a.buyAmount || 0);
+    const pct = a.buyAmount > 0 ? (pnl / a.buyAmount) * 100 : 0;
+    html += `<div class="card-row">
+      <div><div style="font-size:15px;font-weight:500">${a.name}</div><div style="font-size:12px;color:var(--txt2)">${a.qty}주 · 평단 ${(a.avgPrice || 0).toLocaleString()}원</div></div>
+      <div style="text-align:right"><div style="font-size:15px;font-weight:600">${fmtFull(val)}</div>
+      <div class="${cls(pnl)}" style="font-size:12px">${sign(pnl)}${fmt(pnl)} (${sign(pct)}${pct.toFixed(2)}%)</div></div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  // Recent records
+  if (sorted.length > 1) {
+    html += `<div class="section-header">최근 기록</div><div class="card">`;
+    sorted.slice(0,5).forEach(r => {
+      const d = dailyPnL(r);
+      html += `<div class="card-row" onclick="openDetail('${r.id}')">
+        <div><div style="font-size:15px;font-weight:500">${fmtDate(r.date)}</div>
+        <div style="font-size:12px;color:var(--txt2)">${fmtFull(r.totalValue)}</div></div>
+        <div style="text-align:right"><div class="${cls(d)}" style="font-size:14px;font-weight:600">${sign(d)}${fmt(d)}</div></div>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `<div style="height:8px"></div>`;
+  el.innerHTML = html;
+
+  // Draw chart
+  if (sorted.length > 1) {
+    setTimeout(() => drawPnLChart(sorted.reverse()), 50);
+  }
+}
+
+function drawPnLChart(chronological) {
+  const canvas = document.getElementById('pnl-chart');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth;
+  canvas.width = W * window.devicePixelRatio;
+  canvas.height = 120 * window.devicePixelRatio;
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const w = W, h = 120;
+  ctx.clearRect(0, 0, w, h);
+
+  const values = chronological.map(r => r.totalPnL);
+  const min = Math.min(...values, 0);
+  const max = Math.max(...values, 0);
+  const range = max - min || 1;
+
+  const pad = { l: 4, r: 4, t: 12, b: 20 };
+  const cw = w - pad.l - pad.r;
+  const ch = h - pad.t - pad.b;
+
+  const pts = values.map((v, i) => ({
+    x: pad.l + (i / (values.length - 1 || 1)) * cw,
+    y: pad.t + (1 - (v - min) / range) * ch
+  }));
+
+  const isProfit = values[values.length - 1] >= 0;
+  const lineColor = isProfit ? '#ff453a' : '#0a84ff';
+
+  // Gradient fill
+  const grad = ctx.createLinearGradient(0, pad.t, 0, pad.t + ch);
+  grad.addColorStop(0, isProfit ? 'rgba(255,69,58,.35)' : 'rgba(10,132,255,.35)');
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+
   ctx.beginPath();
-  ctx.roundRect(offX, offY, courtW, courtH, 4);
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.lineTo(pts[pts.length-1].x, pad.t + ch);
+  ctx.lineTo(pts[0].x, pad.t + ch);
+  ctx.closePath();
+  ctx.fillStyle = grad;
   ctx.fill();
 
-  ctx.strokeStyle = 'rgba(255,255,255,0.04)';
-  ctx.lineWidth = 1;
-  for (let i = 0; i < 20; i++) {
-    const y = offY + (courtH / 20) * i;
-    ctx.beginPath(); ctx.moveTo(offX, y); ctx.lineTo(offX + courtW, y); ctx.stroke();
-  }
-
-  ctx.fillStyle = 'rgba(233,69,96,0.07)';
-  ctx.fillRect(offX, offY, courtW * 0.5, courtH);
-  ctx.fillStyle = 'rgba(0,212,255,0.07)';
-  ctx.fillRect(offX + courtW * 0.5, offY, courtW * 0.5, courtH);
-
-  function line(x1, y1, x2, y2, w = 1.5, style = '#ffffff') {
-    const p1 = c2s(x1 / 13.4, y1 / 6.1), p2 = c2s(x2 / 13.4, y2 / 6.1);
-    ctx.strokeStyle = style; ctx.lineWidth = w;
-    ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
-  }
-
-  line(0, 0, 13.4, 0, 2.5); line(13.4, 0, 13.4, 6.1, 2.5);
-  line(13.4, 6.1, 0, 6.1, 2.5); line(0, 6.1, 0, 0, 2.5);
-  line(0, 0.46, 13.4, 0.46); line(0, 5.64, 13.4, 5.64);
-  line(4.72, 0, 4.72, 6.1); line(8.68, 0, 8.68, 6.1);
-  line(0.76, 0.46, 0.76, 5.64); line(12.64, 0.46, 12.64, 5.64);
-  line(4.72, 3.05, 8.68, 3.05);
-  line(6.7, 0, 6.7, 6.1, 3, 'rgba(255,255,255,0.95)');
-
-  const netX = offX + (6.7 / 13.4) * courtW;
-  const nh = courtH * 0.06, ntop = offY - nh;
-  ctx.strokeStyle = 'rgba(200,200,200,0.8)'; ctx.lineWidth = 3; ctx.setLineDash([]);
-  ctx.beginPath(); ctx.moveTo(netX, ntop); ctx.lineTo(netX, offY + courtH + nh); ctx.stroke();
-  ctx.strokeStyle = 'rgba(180,180,180,0.3)'; ctx.lineWidth = 1;
-  for (let ny = ntop; ny < offY + courtH + nh; ny += 8) {
-    ctx.beginPath(); ctx.moveTo(netX - 5, ny); ctx.lineTo(netX + 5, ny); ctx.stroke();
-  }
-  const midY = offY + courtH * 0.5;
-  ctx.fillStyle = 'rgba(0,0,0,0.55)';
-  ctx.beginPath(); ctx.roundRect(netX - 16, midY - 9, 32, 18, 4); ctx.fill();
-  ctx.fillStyle = '#fff';
-  ctx.font = `bold ${Math.max(9, courtW * 0.013)}px -apple-system,sans-serif`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('NET', netX, midY);
-
-  const fsz = Math.max(10, courtW * 0.014);
-  ctx.font = `bold ${fsz}px -apple-system,sans-serif`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  const la = c2s(0.25, 0.06); ctx.fillStyle = 'rgba(233,69,96,0.55)';  ctx.fillText('팀  A', la.x, la.y);
-  const lb = c2s(0.75, 0.06); ctx.fillStyle = 'rgba(0,212,255,0.55)';  ctx.fillText('팀  B', lb.x, lb.y);
-
-  const sf = Math.max(16, courtW * 0.025);
-  ctx.font = `bold ${sf}px -apple-system,sans-serif`;
-  const sa = c2s(0.12, 0.5); ctx.fillStyle = 'rgba(233,69,96,0.6)';  ctx.fillText(scores.a, sa.x, sa.y);
-  const sb = c2s(0.88, 0.5); ctx.fillStyle = 'rgba(0,212,255,0.6)';  ctx.fillText(scores.b, sb.x, sb.y);
-}
-
-function renderItem(d) {
-  ctx.save();
-  ctx.strokeStyle = d.color; ctx.fillStyle = d.color;
-  ctx.lineWidth = d.width; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-  if (d.type === 'arrow') {
-    drawArrow(d.x1, d.y1, d.x2, d.y2, d.color, d.width);
-  } else if (d.type === 'path') {
-    if (d.points.length < 2) { ctx.restore(); return; }
-    ctx.beginPath(); ctx.moveTo(d.points[0].x, d.points[0].y);
-    d.points.forEach((p, i) => { if (i > 0) ctx.lineTo(p.x, p.y); });
-    ctx.stroke();
-  } else if (d.type === 'shuttle-path') {
-    ctx.setLineDash([7, 5]);
-    ctx.beginPath(); ctx.moveTo(d.x1, d.y1); ctx.lineTo(d.x2, d.y2); ctx.stroke();
-    ctx.setLineDash([]);
-    drawArrowHead(d.x1, d.y1, d.x2, d.y2, d.color, d.width);
-  }
-  ctx.restore();
-}
-
-function drawArrow(x1, y1, x2, y2, color, w) {
-  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke();
-  drawArrowHead(x1, y1, x2, y2, color, w);
-}
-
-function drawArrowHead(x1, y1, x2, y2, color, w) {
-  const angle = Math.atan2(y2 - y1, x2 - x1);
-  const len = Math.max(14, w * 4);
   ctx.beginPath();
-  ctx.moveTo(x2, y2);
-  ctx.lineTo(x2 - len * Math.cos(angle - 0.38), y2 - len * Math.sin(angle - 0.38));
-  ctx.lineTo(x2 - len * Math.cos(angle + 0.38), y2 - len * Math.sin(angle + 0.38));
-  ctx.closePath(); ctx.fillStyle = color; ctx.fill();
-}
+  pts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.strokeStyle = lineColor;
+  ctx.lineWidth = 2;
+  ctx.lineJoin = 'round';
+  ctx.stroke();
 
-function drawPlayers() {
-  const r = Math.max(16, courtW * 0.026);
-  Object.entries(PLAYERS).forEach(([key, p]) => {
-    const pos = c2s(p.x, p.y);
-    ctx.beginPath(); ctx.arc(pos.x + 2, pos.y + 2, r, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.fill();
-    ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-    ctx.fillStyle = p.color; ctx.fill();
-
-    // Highlight if selected via sidebar tap
-    if (selectedToken === key) {
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 3;
-      ctx.setLineDash([4, 3]);
-      ctx.beginPath(); ctx.arc(pos.x, pos.y, r + 4, 0, Math.PI * 2); ctx.stroke();
-      ctx.setLineDash([]);
-    } else {
-      ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+  // Date labels
+  ctx.fillStyle = 'rgba(128,128,128,.8)';
+  ctx.font = '10px -apple-system';
+  ctx.textAlign = 'center';
+  const step = Math.max(1, Math.floor(chronological.length / 4));
+  chronological.forEach((r, i) => {
+    if (i % step === 0 || i === chronological.length - 1) {
+      ctx.fillText(fmtDateShort(r.date), pts[i].x, h - 4);
     }
-
-    ctx.fillStyle = p.textColor;
-    ctx.font = `bold ${Math.max(10, r * 0.68)}px -apple-system,sans-serif`;
-    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(p.label, pos.x, pos.y);
   });
 }
 
-function drawShuttle() {
-  const pos = c2s(SHUTTLE.x, SHUTTLE.y);
-  const r = Math.max(10, courtW * 0.014);
-  ctx.beginPath(); ctx.arc(pos.x + 1, pos.y + 1, r, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(0,0,0,0.3)'; ctx.fill();
-  ctx.beginPath(); ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-  ctx.fillStyle = '#fffde7'; ctx.fill();
-  ctx.strokeStyle = '#ffdd57'; ctx.lineWidth = 2; ctx.stroke();
-  ctx.font = `${Math.max(9, r)}px Arial`;
-  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-  ctx.fillText('🏸', pos.x, pos.y);
-}
-
-// ── Interaction helpers ───────────────────────────────────
-function getPos(e) {
-  const rect = canvas.getBoundingClientRect();
-  const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
-  const src = e.touches ? e.touches[0] : e;
-  return { x: (src.clientX - rect.left) * sx, y: (src.clientY - rect.top) * sy };
-}
-
-function playerAt(x, y) {
-  const r = Math.max(16, courtW * 0.026) + 8;
-  for (const [k, p] of Object.entries(PLAYERS)) {
-    if (Math.hypot(x - c2s(p.x, p.y).x, y - c2s(p.x, p.y).y) < r) return k;
-  }
-  return null;
-}
-
-function shuttleAt(x, y) {
-  const pos = c2s(SHUTTLE.x, SHUTTLE.y);
-  return Math.hypot(x - pos.x, y - pos.y) < Math.max(10, courtW * 0.014) + 10;
-}
-
-// ── Canvas touch / mouse ──────────────────────────────────
-canvas.addEventListener('mousedown',  onDown);
-canvas.addEventListener('mousemove',  onMv);
-canvas.addEventListener('mouseup',   onUp);
-canvas.addEventListener('mouseleave', onUp);
-canvas.addEventListener('touchstart', e => { e.preventDefault(); onDown(e); }, { passive: false });
-canvas.addEventListener('touchmove',  e => { e.preventDefault(); onMv(e);   }, { passive: false });
-canvas.addEventListener('touchend',   e => { e.preventDefault(); onUp(e);   });
-
-function onDown(e) {
-  const p = getPos(e);
-
-  // If a sidebar token is selected, place it on tap
-  if (selectedToken && tool === 'move') {
-    const cc = s2c(p.x, p.y);
-    PLAYERS[selectedToken].x = Math.max(0, Math.min(1, cc.cx));
-    PLAYERS[selectedToken].y = Math.max(0, Math.min(1, cc.cy));
-    clearTokenSelection();
-    draw();
+// ═══════════════════════════════════════════
+//  RECORDS
+// ═══════════════════════════════════════════
+function renderRecords() {
+  const sorted = enrich(sortedRecords());
+  const el = document.getElementById('records-list');
+  if (!sorted.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">📋</div><div class="empty-title">기록이 없습니다</div><div class="empty-desc">＋ 버튼으로 자산 기록을 추가해보세요</div></div>`;
     return;
   }
 
-  if (tool === 'erase') { isDrawing = true; eraseAt(p.x, p.y); return; }
-
-  if (tool === 'move') {
-    const pl = playerAt(p.x, p.y);
-    if (pl) {
-      dragPlayer = pl;
-      const pp = c2s(PLAYERS[pl].x, PLAYERS[pl].y);
-      dragOffset = { x: p.x - pp.x, y: p.y - pp.y };
-      return;
-    }
-    if (shuttleAt(p.x, p.y)) {
-      dragPlayer = '__shuttle__';
-      const sp = c2s(SHUTTLE.x, SHUTTLE.y);
-      dragOffset = { x: p.x - sp.x, y: p.y - sp.y };
-      return;
-    }
-    return;
-  }
-
-  isDrawing = true;
-  drawStart = p;
-  if (tool === 'draw') currentPath = [p];
+  let html = '<div style="height:8px"></div><div class="card">';
+  sorted.forEach(r => {
+    const d = dailyPnL(r);
+    const cumPct = r.totalPnLPct;
+    html += `<div class="record-item" onclick="openDetail('${r.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div class="record-date">${fmtDate(r.date)}</div>
+          <div class="record-meta">평가 ${fmtFull(r.totalValue)} · ${r.assets?.length || 0}종목</div>
+        </div>
+        <div class="record-values">
+          <div class="${cls(d)}" style="font-size:14px;font-weight:600">${sign(d)}${fmt(d)}</div>
+          <div class="${cls(r.totalPnL)}" style="font-size:12px">${sign(cumPct)}${cumPct.toFixed(2)}%</div>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += '</div><div style="height:8px"></div>';
+  el.innerHTML = html;
 }
 
-function onMv(e) {
-  const p = getPos(e);
-  if (tool === 'erase' && isDrawing) { eraseAt(p.x, p.y); return; }
+function openDetail(id) {
+  const all = enrich(sortedRecords());
+  const r = all.find(x => x.id === id);
+  if (!r) return;
 
-  if (dragPlayer) {
-    const cc = s2c(p.x - dragOffset.x, p.y - dragOffset.y);
-    if (dragPlayer === '__shuttle__') {
-      SHUTTLE.x = Math.max(0, Math.min(1, cc.cx));
-      SHUTTLE.y = Math.max(0, Math.min(1, cc.cy));
-    } else {
-      PLAYERS[dragPlayer].x = Math.max(0, Math.min(1, cc.cx));
-      PLAYERS[dragPlayer].y = Math.max(0, Math.min(1, cc.cy));
+  const d = dailyPnL(r);
+  const dailyPct = (all.find(x => x.id !== id && new Date(x.date) < new Date(r.date))?.totalValue || 0);
+  const dPct = dailyPct > 0 ? (d / dailyPct) * 100 : 0;
+
+  document.getElementById('detail-title').textContent = fmtDate(r.date);
+  document.getElementById('detail-edit-btn').onclick = () => openEditRecord(id);
+  document.getElementById('detail-delete-btn').onclick = () => {
+    if (confirm('이 기록을 삭제하시겠습니까?')) {
+      scanRecords = scanRecords.filter(x => x.id !== id);
+      save();
+      closeModal('detail-modal');
+      renderDashboard();
+      renderRecords();
+      toast('삭제되었습니다');
     }
-    draw(); return;
-  }
+  };
 
-  if (!isDrawing) return;
+  let html = `<div class="card">
+    <div class="card-row"><span style="color:var(--txt2)">총 평가금액</span><span style="font-weight:700">${fmtFull(r.totalValue)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">투자 원금</span><span>${fmtFull(r.totalInvestment)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">일별 손익</span><span class="${cls(d)}" style="font-weight:600">${sign(d)}${fmtFull(d)} (${sign(dPct)}${dPct.toFixed(2)}%)</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">누적 손익</span><span class="${cls(r.totalPnL)}" style="font-weight:600">${sign(r.totalPnL)}${fmtFull(r.totalPnL)} (${sign(r.totalPnLPct)}${r.totalPnLPct.toFixed(2)}%)</span></div>
+  </div>
+  <div class="section-header" style="margin-top:8px">보유 종목</div>
+  <div class="card" style="padding:0 16px">`;
 
-  if (tool === 'draw') {
-    currentPath.push(p);
-    draw();
-    ctx.save();
-    ctx.strokeStyle = drawColor; ctx.lineWidth = drawWidth;
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(currentPath[0].x, currentPath[0].y);
-    currentPath.forEach((pt, i) => { if (i > 0) ctx.lineTo(pt.x, pt.y); });
-    ctx.stroke(); ctx.restore();
+  (r.assets || []).forEach(a => {
+    const val = a.evalAmount || 0;
+    const pnl = val - (a.buyAmount || 0);
+    const pct = a.buyAmount > 0 ? (pnl / a.buyAmount) * 100 : 0;
+    html += `<div class="asset-row">
+      <div><div class="asset-name">${a.name}</div><div class="asset-sym">매입 ${fmtFull(a.buyAmount || 0)} · ${a.qty}주 · 평단 ${(a.avgPrice || 0).toLocaleString()}원</div></div>
+      <div class="asset-right">
+        <div style="font-size:15px;font-weight:600">${fmtFull(val)}</div>
+        <div class="${cls(pnl)}" style="font-size:12px">${sign(pnl)}${fmtFull(pnl)} (${sign(pct)}${pct.toFixed(2)}%)</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  document.getElementById('detail-content').innerHTML = html;
+  openModal('detail-modal');
+}
+
+// ═══════════════════════════════════════════
+//  SCAN / ADD RECORD
+// ═══════════════════════════════════════════
+let scanAssetRows = [];
+
+function emptyScanRow() {
+  return { id: uuid(), name: '', buyAmount: '', qty: '', avgPrice: '', evalAmount: '' };
+}
+
+function openScanModal() {
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('scan-date').value = today;
+  scanAssetRows = [emptyScanRow()];
+  editingRecordId = null;
+  document.querySelector('#scan-modal .modal-title').textContent = '자산 기록 추가';
+  renderScanAssets();
+  clearScanImage();
+  openModal('scan-modal');
+}
+
+function openEditRecord(id) {
+  const r = scanRecords.find(x => x.id === id);
+  if (!r) return;
+  closeModal('detail-modal');
+  document.getElementById('scan-date').value = r.date;
+  scanAssetRows = (r.assets || []).map(a => ({
+    id: uuid(), name: a.name,
+    buyAmount: String(a.buyAmount || ''), qty: String(a.qty || ''),
+    avgPrice: String(a.avgPrice || ''), evalAmount: String(a.evalAmount || ''),
+    _changed: false
+  }));
+  editingRecordId = id;
+  document.querySelector('#scan-modal .modal-title').textContent = '자산 기록 수정';
+  renderScanAssets();
+  clearScanImage();
+  // iOS Safari: 모달 전환 시 짧은 딜레이 필요
+  setTimeout(() => openModal('scan-modal'), 80);
+}
+
+function addScanAssetRow() {
+  scanAssetRows.push(emptyScanRow());
+  renderScanAssets();
+}
+
+// 입력 항목: 상품명 / 매입금액 / 보유수량 / 매입단가 / 평가금액
+function renderScanAssets() {
+  const el = document.getElementById('scan-assets-list');
+  const inputStyle = 'text-align:left;flex:1;background:var(--bg3);border-radius:8px;padding:7px 10px;min-width:0';
+  const labelStyle = 'font-size:10px;color:var(--txt2);margin-bottom:2px';
+  el.innerHTML = scanAssetRows.map((a, i) => {
+    const hl = a._changed ? 'border:1.5px solid var(--orange);' : '';
+    const nameHl = a._nameWarning ? 'border:1.5px solid var(--orange);' : '';
+    return `
+    <div class="form-group" style="flex-wrap:wrap;gap:6px;padding:10px 16px">
+      <div style="width:100%;display:flex;gap:6px;align-items:center">
+        <div style="flex:1">
+          <div style="${labelStyle}">상품명${a._nameWarning ? ' ⚠️ 확인 필요' : ''}</div>
+          <input class="form-input" style="${inputStyle};width:100%;${nameHl}" type="text" placeholder="TIGER 미국S&P500" value="${a.name}" oninput="updateScanRow(${i},'name',this.value)">
+        </div>
+        <button onclick="removeScanRow(${i})" style="background:none;border:none;color:var(--red);font-size:20px;padding:0 4px;cursor:pointer;align-self:flex-end">×</button>
+      </div>
+      <div style="width:100%;display:flex;gap:6px">
+        <div style="flex:1.2">
+          <div style="${labelStyle}">매입금액</div>
+          <input class="form-input" style="${inputStyle};width:100%" type="number" placeholder="7,966,500" value="${a.buyAmount}" oninput="updateScanRow(${i},'buyAmount',this.value)">
+        </div>
+        <div style="flex:0.8">
+          <div style="${labelStyle}">보유수량</div>
+          <input class="form-input" style="${inputStyle};width:100%" type="number" placeholder="500" value="${a.qty}" oninput="updateScanRow(${i},'qty',this.value)">
+        </div>
+      </div>
+      <div style="width:100%;display:flex;gap:6px">
+        <div style="flex:0.8">
+          <div style="${labelStyle}">매입단가</div>
+          <input class="form-input" style="${inputStyle};width:100%" type="number" placeholder="15,933" value="${a.avgPrice}" oninput="updateScanRow(${i},'avgPrice',this.value)">
+        </div>
+        <div style="flex:1.2">
+          <div style="${labelStyle}">평가금액</div>
+          <input class="form-input" style="${inputStyle};width:100%;${hl}" type="number" placeholder="6,775,000" value="${a.evalAmount}" oninput="updateScanRow(${i},'evalAmount',this.value)">
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateScanRow(i, field, val) {
+  scanAssetRows[i][field] = val;
+}
+
+function removeScanRow(i) {
+  scanAssetRows.splice(i, 1);
+  renderScanAssets();
+}
+
+function saveScanRecord() {
+  const date = document.getElementById('scan-date').value;
+  if (!date) { toast('날짜를 선택해주세요'); return; }
+  const assets = scanAssetRows.filter(a => a.name.trim()).map(a => {
+    const qty = parseFloat(a.qty) || 0;
+    const avgPrice = parseFloat(a.avgPrice) || 0;
+    // 매입금액 미입력 시 보유수량×매입단가로 자동 계산
+    const buyAmount = parseFloat(a.buyAmount) || Math.round(qty * avgPrice);
+    return {
+      name: a.name.trim(), symbol: '',
+      buyAmount, qty, avgPrice,
+      evalAmount: parseFloat(a.evalAmount) || 0
+    };
+  });
+  if (!assets.length) { toast('종목을 하나 이상 입력해주세요'); return; }
+
+  if (editingRecordId) {
+    // 수정 모드: 특정 기록 업데이트
+    const idx = scanRecords.findIndex(r => r.id === editingRecordId);
+    if (idx >= 0) {
+      scanRecords[idx] = { ...scanRecords[idx], date, assets };
+      toast('기록이 수정되었습니다');
+    }
+    editingRecordId = null;
   } else {
-    drawPreview(p);
-  }
-}
-
-function drawPreview(p) {
-  if (!drawStart) return;
-  draw();
-  ctx.save(); ctx.globalAlpha = 0.75;
-  ctx.strokeStyle = drawColor; ctx.fillStyle = drawColor;
-  ctx.lineWidth = drawWidth; ctx.lineCap = 'round';
-  if (tool === 'arrow') {
-    drawArrow(drawStart.x, drawStart.y, p.x, p.y, drawColor, drawWidth);
-  } else if (tool === 'shuttle') {
-    ctx.setLineDash([7, 5]);
-    ctx.beginPath(); ctx.moveTo(drawStart.x, drawStart.y); ctx.lineTo(p.x, p.y); ctx.stroke();
-    ctx.setLineDash([]);
-    drawArrowHead(drawStart.x, drawStart.y, p.x, p.y, drawColor, drawWidth);
-  }
-  ctx.restore();
-}
-
-function onUp(e) {
-  if (dragPlayer) { dragPlayer = null; return; }
-  if (!isDrawing)  return;
-  isDrawing = false;
-
-  let ep;
-  if (e.changedTouches) {
-    const rect = canvas.getBoundingClientRect();
-    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
-    ep = { x: (e.changedTouches[0].clientX - rect.left) * sx,
-           y: (e.changedTouches[0].clientY - rect.top)  * sy };
-  } else { ep = getPos(e); }
-
-  if (tool === 'arrow' && drawStart)
-    drawings.push({ type:'arrow', x1:drawStart.x, y1:drawStart.y, x2:ep.x, y2:ep.y, color:drawColor, width:drawWidth });
-  else if (tool === 'shuttle' && drawStart)
-    drawings.push({ type:'shuttle-path', x1:drawStart.x, y1:drawStart.y, x2:ep.x, y2:ep.y, color:'#4ecdc4', width:drawWidth });
-  else if (tool === 'draw' && currentPath.length > 1)
-    drawings.push({ type:'path', points:[...currentPath], color:drawColor, width:drawWidth });
-
-  drawStart = null; currentPath = []; draw();
-}
-
-function eraseAt(x, y) {
-  const thr = 20;
-  drawings = drawings.filter(d => {
-    if (d.type === 'arrow' || d.type === 'shuttle-path')
-      return !nearSeg(x, y, d.x1, d.y1, d.x2, d.y2, thr);
-    if (d.type === 'path')
-      return !d.points.some((pt, i) => i > 0 && nearSeg(x, y, d.points[i-1].x, d.points[i-1].y, pt.x, pt.y, thr));
-    return true;
-  });
-  draw();
-}
-
-function nearSeg(px, py, x1, y1, x2, y2, thr) {
-  const dx = x2-x1, dy = y2-y1, l2 = dx*dx+dy*dy;
-  if (!l2) return Math.hypot(px-x1, py-y1) < thr;
-  const t = Math.max(0, Math.min(1, ((px-x1)*dx+(py-y1)*dy)/l2));
-  return Math.hypot(px-(x1+t*dx), py-(y1+t*dy)) < thr;
-}
-
-// ── Sidebar token interactions (touch-friendly) ───────────
-// Method A: tap-to-select → tap on court to place
-// Method B: long-press drag → ghost follows finger → drop on court
-
-const LONG_PRESS_MS = 350;
-let tokenPressTimer = null;
-let tokenPressKey   = null;
-let tokenPressTouch = null;
-
-document.querySelectorAll('.player-token').forEach(el => {
-  const key = el.dataset.player;
-
-  // ─ Tap: select / deselect
-  el.addEventListener('click', () => {
-    if (sidebarDragPlayer) return; // ignore if just finished a drag
-    if (selectedToken === key) {
-      clearTokenSelection();
+    // 같은 날짜 기록이 있으면 새로 추가하지 않고 업데이트
+    const existing = scanRecords.find(r => r.date === date);
+    if (existing) {
+      existing.assets = assets;
+      toast('기존 기록이 업데이트되었습니다');
     } else {
-      setTokenSelection(key);
+      scanRecords.push({ id: uuid(), date, assets });
+      toast('기록이 저장되었습니다');
+    }
+  }
+  save();
+  closeModal('scan-modal');
+  renderDashboard();
+  renderRecords();
+}
+
+function captureScan() {
+  document.getElementById('camera-input').click();
+}
+
+function clearScanImage() {
+  document.getElementById('scan-img-preview').style.display = 'none';
+  document.getElementById('scan-img-el').src = '';
+  document.getElementById('ocr-status').style.display = 'none';
+  document.getElementById('ocr-summary').style.display = 'none';
+}
+
+function processImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('scan-img-el').src = e.target.result;
+    document.getElementById('scan-img-preview').style.display = 'block';
+    runOCR(e.target.result);
+  };
+  reader.readAsDataURL(file);
+  event.target.value = '';
+}
+
+// ═══════════════════════════════════════════
+//  OCR (Tesseract.js — iOS Safari 지원)
+// ═══════════════════════════════════════════
+let tesseractLoading = null;
+function loadTesseract() {
+  if (window.Tesseract) return Promise.resolve();
+  if (!tesseractLoading) {
+    tesseractLoading = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+      s.onload = resolve;
+      s.onerror = () => { tesseractLoading = null; reject(new Error('script load fail')); };
+      document.head.appendChild(s);
+    });
+  }
+  return tesseractLoading;
+}
+
+let ocrWorker = null;
+async function getOcrWorker(statusEl) {
+  if (ocrWorker) return ocrWorker;
+  statusEl.textContent = 'OCR 엔진 로딩 중... (최초 1회, 잠시 걸립니다)';
+  await loadTesseract();
+  ocrWorker = await Tesseract.createWorker('kor+eng', 1, {
+    logger: m => {
+      if (m.status === 'recognizing text') {
+        statusEl.textContent = `텍스트 인식 중... ${Math.round(m.progress * 100)}%`;
+      } else if (m.status === 'loading language traineddata') {
+        statusEl.textContent = `한글 인식 데이터 다운로드 중... ${Math.round((m.progress || 0) * 100)}%`;
+      }
+    }
+  });
+  return ocrWorker;
+}
+
+async function runOCR(dataURL) {
+  const statusEl = document.getElementById('ocr-status');
+  statusEl.style.display = 'block';
+  statusEl.textContent = '준비 중...';
+  try {
+    const worker = await getOcrWorker(statusEl);
+    const { data } = await worker.recognize(dataURL);
+    const parsed = parseAssetsFromText(data.text);
+    statusEl.style.display = 'none';
+    if (!parsed.length) {
+      toast('종목을 인식하지 못했습니다 — 사진을 보며 직접 입력해 주세요');
+      return;
+    }
+    applyParsedAssets(parsed);
+  } catch (err) {
+    statusEl.style.display = 'none';
+    console.log('OCR 실패:', err);
+    toast('자동 인식 실패 — 사진을 보며 직접 입력해 주세요');
+  }
+}
+
+// OCR 텍스트 파싱 — 라벨 구조 → 컴팩트 잔고 목록 → 일반 휴리스틱 순으로 시도
+function parseAssetsFromText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const structured = parseStructuredBlocks(lines);
+  if (structured.length) return structured;
+  const compact = parseCompactBlocks(lines);
+  if (compact.length) return compact;
+  return parseGenericBlocks(lines);
+}
+
+function ocrNum(s) {
+  const m = s.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/);
+  return m ? parseFloat(m[0].replace(/,/g, '')) : null;
+}
+
+// OCR 상품명 후처리: 끝에 붙는 노이즈 제거
+function cleanOcrName(name) {
+  let s = name;
+  // 후미 소문자 한 글자 제거 ("적격 f" → "적격")
+  s = s.replace(/\s+[a-z]$/i, m => /[A-Z]/.test(m) ? m : '');
+  // 후미 한글 한 글자 괄호 제거 ("액티브(너)" → "액티브")
+  s = s.replace(/\([가-힣]\)\s*$/, '');
+  // 닫는 괄호가 여는 괄호보다 많으면 맨 뒤 ) 제거
+  const op = (s.match(/\(/g) || []).length;
+  const cl = (s.match(/\)/g) || []).length;
+  if (cl > op) s = s.replace(/\)\s*$/, '');
+  return s.trim();
+}
+
+// 증권앱 라벨 구조 파싱:
+//   종목명
+//   매입금액            7,966,500원
+//   보유수량/매입단가    500주 / 15,933원
+//   평가금액            6,775,000원
+// "매입금액" 라벨을 기준으로 역방향으로 이름 탐지 — OCR 노이즈로 이름 앞쪽에
+// 불필요한 텍스트가 끼더라도 정확한 이름을 찾을 수 있도록 개선
+function parseStructuredBlocks(lines) {
+  const results = [];
+  const labelRe = /매입\s*금액|보유\s*수량|매입\s*단가|평가\s*금액|평가\s*손익|수익률/;
+  const noiseRe = /^(매수|매도|ETF|금융상품|디폴트|연금계좌|관심종목|투자NOW|MY자산|메뉴|홈|국내|해외|예수금|체결|주문|차트|리츠)/;
+  const isJunk = s => {
+    if (!s || s.length < 2) return true;
+    if (/^[\d,.\s%원주\/▲▼()+\-]+$/.test(s)) return true;
+    if (labelRe.test(s)) return true;
+    if (noiseRe.test(s)) return true;
+    return false;
+  };
+
+  for (let i = 1; i < lines.length; i++) {
+    const l = lines[i];
+    // "매입금액" 라벨 라인을 기준점으로 사용
+    if (!/매입\s*금액/.test(l)) continue;
+
+    // 이름: 매입금액 바로 위 유효한 라인을 역방향 탐색 (최대 4줄 위까지)
+    let name = null;
+    for (let k = i - 1; k >= Math.max(0, i - 4); k--) {
+      const candidate = lines[k]
+        .replace(/[<>›〉‹▲▼]/g, '')
+        .replace(/\s*[>›]+\s*$/, '')
+        .trim();
+      if (!isJunk(candidate)) {
+        name = candidate.replace(/\s+/g, ' ');
+        break;
+      }
+    }
+    if (!name || name.length < 2) continue;
+
+    // 매입금액 값 추출
+    const investment = ocrNum(l.replace(/매입\s*금액/, ''));
+
+    // 이후 ~7줄에서 보유수량/매입단가, 평가금액 수집
+    let qty = null, avgPrice = null, value = null;
+    let consumed = i;
+    for (let j = i + 1; j < Math.min(i + 8, lines.length); j++) {
+      const lj = lines[j];
+      if (qty === null) {
+        const qm = lj.match(/(\d{1,3}(?:,\d{3})*)\s*주\s*[\/|]?\s*(\d{1,3}(?:,\d{3})*)\s*원?/);
+        if (qm) {
+          qty = parseFloat(qm[1].replace(/,/g, ''));
+          avgPrice = parseFloat(qm[2].replace(/,/g, ''));
+        }
+      }
+      if (value === null && /평가\s*금액/.test(lj)) {
+        value = ocrNum(lj.replace(/평가\s*금액/, ''));
+        consumed = j;
+        break;
+      }
+    }
+
+    if (qty > 0 && value > 0) {
+      if (investment && (!avgPrice || Math.abs(qty * avgPrice - investment) / investment > 0.05)) {
+        avgPrice = Math.round(investment / qty);
+      }
+      const cleanName = cleanOcrName(name);
+      const normName = cleanName.replace(/\s+/g, '').toLowerCase();
+      // 동일 이름 중복 방지
+      if (!results.some(r => r.name.replace(/\s+/g, '').toLowerCase() === normName)) {
+        results.push({
+          name: cleanName,
+          buyAmount: investment || Math.round(qty * (avgPrice || 0)),
+          qty,
+          avgPrice: avgPrice || 0,
+          evalAmount: value,
+          structured: true
+        });
+      }
+      i = consumed;
+    }
+  }
+  return results;
+}
+
+// 컴팩트 잔고 목록 파싱 (잔고 화면):
+//   TIGER 미국S&P500         77,546,000원
+//   2800주 · 평단 24,465원   +904만원 (+13.20%)
+// "N주 · 평단 N원" 패턴을 앵커로 사용
+function parseCompactBlocks(lines) {
+  const results = [];
+  // "N주 · 평단 N원" — 중점(·) 또는 일반 점, OCR 오차 허용
+  const qtyRe = /(\d{1,3}(?:,\d{3})*)\s*주\s*[·・.]\s*평단\s*(\d{1,3}(?:,\d{3})*)\s*원/;
+
+  for (let i = 1; i < lines.length; i++) {
+    const qm = lines[i].match(qtyRe);
+    if (!qm) continue;
+
+    const qty = parseFloat(qm[1].replace(/,/g, ''));
+    const avgPrice = parseFloat(qm[2].replace(/,/g, ''));
+    if (qty <= 0 || avgPrice <= 0) continue;
+
+    // 위 1~2줄에서 종목명과 평가금액 탐색
+    let name = null, evalAmount = null;
+    for (let k = i - 1; k >= Math.max(0, i - 2); k--) {
+      const prev = lines[k];
+      // 이 줄에 금액(원)이 포함된 경우 — 종목명과 평가금액이 같은 줄
+      const amtM = prev.match(/(\d{1,3}(?:,\d{3})+)\s*원/);
+      if (amtM) {
+        const v = parseFloat(amtM[1].replace(/,/g, ''));
+        if (v > avgPrice) { // 평단가보다 커야 평가금액
+          evalAmount = v;
+          const namePart = prev.slice(0, prev.indexOf(amtM[0])).replace(/[<>›〉‹▲▼]/g, '').trim();
+          if (namePart.length >= 2) name = cleanOcrName(namePart.replace(/\s+/g, ' '));
+        }
+      } else if (!name && prev.length >= 2 && !/^[\d,.\s%+\-원주·]+$/.test(prev)) {
+        name = cleanOcrName(prev.replace(/[<>›〉‹▲▼]/g, '').replace(/\s+/g, ' ').trim());
+      }
+      if (name && evalAmount) break;
+    }
+
+    // 평가금액이 같은 줄에 없으면 바로 위 줄에서 별도 탐색
+    if (!evalAmount) {
+      for (let k = Math.max(0, i - 2); k < i; k++) {
+        const amtM = lines[k].match(/(\d{1,3}(?:,\d{3})+)\s*원/);
+        if (amtM) {
+          const v = parseFloat(amtM[1].replace(/,/g, ''));
+          if (v > avgPrice) { evalAmount = v; break; }
+        }
+      }
+    }
+
+    if (!name || !evalAmount || qty <= 0) continue;
+    const normName = name.replace(/\s+/g, '').toLowerCase();
+    if (results.some(r => r.name.replace(/\s+/g, '').toLowerCase() === normName)) continue;
+
+    results.push({
+      name,
+      buyAmount: Math.round(qty * avgPrice),
+      qty, avgPrice,
+      evalAmount,
+      structured: true
+    });
+  }
+  return results;
+}
+
+// 일반 휴리스틱: 종목명 + 주변 숫자 수집 (라벨 구조가 아닌 화면용)
+function parseGenericBlocks(lines) {
+  const uiWords = /^(매수|매도|평가금액|평가손익|손익|수익률|총평가|총매입|매입금액|예수금|잔고|계좌|종목명|현재가|수량|보유수량|평균단가|매입단가|등락|전일대비|원|주|체결|주문|차트|관심|국내|해외|합계|총|자산|투자|금액)$/;
+  const results = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const m = lines[i].match(/^([가-힣A-Za-z][가-힣A-Za-z0-9&(). \-\s]*[가-힣A-Za-z0-9])/);
+    if (!m) continue;
+    const name = m[1].replace(/\s+/g, ' ').trim();
+    if (name.length < 2 || uiWords.test(name)) continue;
+    const numText = [lines[i].slice(m[0].length), lines[i + 1] || '', lines[i + 2] || ''].join(' ');
+    const nums = (numText.match(/\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?/g) || [])
+      .map(s => parseFloat(s.replace(/,/g, '')))
+      .filter(n => n > 0);
+    if (!nums.length) continue;
+    const dup = results.find(r => r.name === name);
+    if (dup) { if (nums.length > dup.nums.length) dup.nums = nums; continue; }
+    results.push({ name, nums, structured: false });
+  }
+  return results;
+}
+
+// 인식 결과를 이전 기록과 병합 — 변경된 부분만 업데이트
+function applyParsedAssets(parsed) {
+  const latest = enrich(sortedRecords())[0];
+  const prevAssets = latest ? latest.assets : [];
+  const norm = s => s.replace(/\s+/g, '').toLowerCase();
+  const rows = [];
+  const changes = [];
+  const matchedPrev = new Set();
+
+  parsed.forEach(p => {
+    const prev = prevAssets.find(a => {
+      const n1 = norm(a.name), n2 = norm(p.name);
+      return n1 === n2 || (n1.length >= 3 && n2.includes(n1)) || (n2.length >= 3 && n1.includes(n2));
+    });
+
+    if (p.structured) {
+      // 라벨 구조 인식: 5개 항목(상품명/매입금액/보유수량/매입단가/평가금액) 그대로 매핑
+      if (prev) {
+        matchedPrev.add(norm(prev.name));
+        const evalChanged = p.evalAmount !== prev.evalAmount;
+        const qtyChanged  = p.qty !== prev.qty;
+        const buyChanged  = p.buyAmount > 0 && p.buyAmount !== prev.buyAmount;
+        rows.push({
+          id: uuid(), name: prev.name,
+          buyAmount: String(p.buyAmount > 0 ? p.buyAmount : prev.buyAmount),
+          qty: String(p.qty),
+          avgPrice: String(p.avgPrice > 0 ? p.avgPrice : prev.avgPrice),
+          evalAmount: String(p.evalAmount),
+          _changed: evalChanged || qtyChanged || buyChanged
+        });
+        if (evalChanged || qtyChanged || buyChanged) {
+          const parts = [];
+          if (evalChanged) parts.push(`평가 ${prev.evalAmount.toLocaleString()} → <b>${p.evalAmount.toLocaleString()}원</b>`);
+          if (qtyChanged) parts.push(`${prev.qty}주 → <b>${p.qty}주</b>`);
+          if (buyChanged) parts.push(`매입 ${p.buyAmount.toLocaleString()}원`);
+          changes.push(`<span style="color:var(--orange)">↻</span> ${prev.name}: ${parts.join(' · ')}`);
+        } else {
+          changes.push(`<span style="color:var(--txt3)">=</span> ${prev.name}: 변동 없음`);
+        }
+      } else {
+        const nameWarn = p.name.length < 5 || !/[A-Za-z0-9]/.test(p.name);
+        rows.push({
+          id: uuid(), name: p.name,
+          buyAmount: String(p.buyAmount), qty: String(p.qty),
+          avgPrice: String(p.avgPrice), evalAmount: String(p.evalAmount),
+          _changed: true, _nameWarning: nameWarn
+        });
+        changes.push(`<span style="color:var(--green)">＋</span> ${p.name}${nameWarn ? ' ⚠️' : ''}: 신규 ${p.qty}주 · 평가 ${p.evalAmount.toLocaleString()}원`);
+      }
+    } else if (prev) {
+      // 일반 휴리스틱 + 기존 종목: 이전 평가금액 ±35% 이내 가장 가까운 숫자를 새 평가금액으로
+      matchedPrev.add(norm(prev.name));
+      let newEval = prev.evalAmount, bestRatio = Infinity;
+      p.nums.forEach(n => {
+        if (n === prev.qty || n === prev.avgPrice || n === prev.buyAmount) return;
+        const ratio = Math.abs(n - prev.evalAmount) / Math.max(prev.evalAmount, 1);
+        if (ratio < 0.35 && ratio < bestRatio) { bestRatio = ratio; newEval = n; }
+      });
+      const evalChanged = newEval !== prev.evalAmount;
+      rows.push({
+        id: uuid(), name: prev.name,
+        buyAmount: String(prev.buyAmount), qty: String(prev.qty),
+        avgPrice: String(prev.avgPrice), evalAmount: String(newEval),
+        _changed: evalChanged
+      });
+      changes.push(evalChanged
+        ? `<span style="color:var(--orange)">↻</span> ${prev.name}: 평가 ${prev.evalAmount.toLocaleString()} → <b>${newEval.toLocaleString()}원</b>`
+        : `<span style="color:var(--txt3)">=</span> ${prev.name}: 변동 없음`);
+    } else {
+      // 일반 휴리스틱 + 신규 종목: 최대 숫자를 평가금액으로 추정
+      const sortedNums = [...p.nums].sort((a, b) => b - a);
+      const evalAmount = sortedNums[0] || 0;
+      const intCandidates = p.nums.filter(n => Number.isInteger(n) && n < evalAmount && n <= 100000);
+      const qty = intCandidates.length ? Math.min(...intCandidates) : 0;
+      rows.push({
+        id: uuid(), name: p.name,
+        buyAmount: '', qty: qty ? String(qty) : '',
+        avgPrice: '', evalAmount: evalAmount ? String(evalAmount) : '',
+        _changed: true
+      });
+      changes.push(`<span style="color:var(--green)">＋</span> ${p.name}: 신규 (평가금액 추정 ${evalAmount ? evalAmount.toLocaleString() + '원' : '미인식'})`);
     }
   });
 
-  // ─ Touch long-press drag
-  el.addEventListener('touchstart', e => {
-    tokenPressKey   = key;
-    tokenPressTouch = e.touches[0];
-    tokenPressTimer = setTimeout(() => startSidebarDrag(key, e.touches[0]), LONG_PRESS_MS);
-  }, { passive: true });
+  // 사진에 없는 기존 종목은 이전 값 그대로 유지
+  prevAssets.forEach(a => {
+    if (!matchedPrev.has(norm(a.name))) {
+      rows.push({
+        id: uuid(), name: a.name,
+        buyAmount: String(a.buyAmount), qty: String(a.qty),
+        avgPrice: String(a.avgPrice), evalAmount: String(a.evalAmount),
+        _changed: false
+      });
+      changes.push(`<span style="color:var(--txt3)">＝</span> ${a.name}: 사진에 없음 — 이전 값 유지`);
+    }
+  });
 
-  el.addEventListener('touchmove', e => {
-    if (tokenPressTimer) { clearTimeout(tokenPressTimer); tokenPressTimer = null; }
-    if (sidebarDragPlayer) moveSidebarGhost(e.touches[0]);
-  }, { passive: true });
+  scanAssetRows = rows;
+  renderScanAssets();
 
-  el.addEventListener('touchend', e => {
-    if (tokenPressTimer) { clearTimeout(tokenPressTimer); tokenPressTimer = null; }
-    if (sidebarDragPlayer) dropSidebarDrag(e.changedTouches[0]);
-  }, { passive: true });
-
-  el.addEventListener('touchcancel', () => {
-    if (tokenPressTimer) { clearTimeout(tokenPressTimer); tokenPressTimer = null; }
-    endSidebarGhost();
-  }, { passive: true });
-});
-
-function setTokenSelection(key) {
-  clearTokenSelection();
-  selectedToken = key;
-  document.getElementById('tok-' + key)?.classList.add('selected');
-  document.getElementById('place-hint').style.display = 'block';
-  draw();
+  const summaryEl = document.getElementById('ocr-summary');
+  summaryEl.innerHTML = `<div style="font-weight:600;margin-bottom:4px;font-size:13px">자동 인식 결과 — 확인 후 저장하세요</div>${changes.join('<br>')}`;
+  summaryEl.style.display = 'block';
+  toast(`${parsed.length}개 종목 인식 완료`);
 }
 
-function clearTokenSelection() {
-  if (selectedToken) document.getElementById('tok-' + selectedToken)?.classList.remove('selected');
-  selectedToken = null;
-  document.getElementById('place-hint').style.display = 'none';
-  draw();
-}
+// ═══════════════════════════════════════════
+//  REBALANCING
+// ═══════════════════════════════════════════
+function renderRebal() {
+  const el = document.getElementById('rebal-content');
+  const sorted = enrich(sortedRecords());
+  const latest = sorted[0];
 
-function startSidebarDrag(key, touch) {
-  sidebarDragPlayer = key;
-  clearTokenSelection();
-  const p = PLAYERS[key];
-  ghost.style.display = 'flex';
-  ghost.style.background = p.color;
-  ghost.style.color = p.textColor;
-  ghost.textContent = key;
-  moveSidebarGhost(touch);
-}
-
-function moveSidebarGhost(touch) {
-  if (!sidebarDragPlayer) return;
-  ghost.style.left = touch.clientX + 'px';
-  ghost.style.top  = touch.clientY + 'px';
-}
-
-function dropSidebarDrag(touch) {
-  if (!sidebarDragPlayer) return;
-  const rect = canvas.getBoundingClientRect();
-  if (touch.clientX >= rect.left && touch.clientX <= rect.right &&
-      touch.clientY >= rect.top  && touch.clientY <= rect.bottom) {
-    const sx = canvas.width / rect.width, sy = canvas.height / rect.height;
-    const x = (touch.clientX - rect.left) * sx;
-    const y = (touch.clientY - rect.top)  * sy;
-    const cc = s2c(x, y);
-    PLAYERS[sidebarDragPlayer].x = Math.max(0, Math.min(1, cc.cx));
-    PLAYERS[sidebarDragPlayer].y = Math.max(0, Math.min(1, cc.cy));
-    draw();
+  if (!latest) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚖️</div><div class="empty-title">기록이 없습니다</div><div class="empty-desc">대시보드에서 ＋ 버튼으로<br>자산 기록을 먼저 추가해주세요</div></div>`;
+    return;
   }
-  endSidebarGhost();
-}
 
-function endSidebarGhost() {
-  ghost.style.display = 'none';
-  sidebarDragPlayer = null;
-}
-
-// Desktop drag-drop still works for non-touch
-document.querySelectorAll('.player-token').forEach(el => {
-  el.setAttribute('draggable', 'true');
-  el.addEventListener('dragstart', e => e.dataTransfer.setData('player', el.dataset.player));
-});
-canvas.addEventListener('dragover', e => e.preventDefault());
-canvas.addEventListener('drop', e => {
-  e.preventDefault();
-  const pl = e.dataTransfer.getData('player');
-  if (pl && PLAYERS[pl]) {
-    const p = getPos(e); const cc = s2c(p.x, p.y);
-    PLAYERS[pl].x = Math.max(0, Math.min(1, cc.cx));
-    PLAYERS[pl].y = Math.max(0, Math.min(1, cc.cy));
-    draw();
+  const assets = latest.assets || [];
+  if (!assets.length) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">⚖️</div><div class="empty-title">종목이 없습니다</div></div>`;
+    return;
   }
-});
 
-// ── Controls ──────────────────────────────────────────────
-function setTool(t) {
-  tool = t;
-  ['move','arrow','draw','shuttle','erase'].forEach(id =>
-    document.getElementById('btn-'+id)?.classList.toggle('active', id === t));
-  if (t !== 'move') clearTokenSelection();
-}
+  const totalVal = latest.totalValue;
+  const weights = settings.targetWeights || {};
+  let totalTarget = 0;
+  assets.forEach(a => { totalTarget += (weights[a.name] || 0); });
+  const weightOk = Math.abs(totalTarget - 100) < 0.5;
+  const colors = ['#ff453a','#0a84ff','#30d158','#ffd60a','#ff9f0a','#bf5af2','#64d2ff','#ff6961'];
 
-function setColor(c) {
-  drawColor = c;
-  document.querySelectorAll('.color-btn').forEach(btn =>
-    btn.classList.toggle('active', btn.style.background === c));
-}
+  let html = `<div style="height:8px"></div>`;
 
-function setWidth(w) {
-  drawWidth = w;
-  ['2','4','7'].forEach(v => document.getElementById('w'+v)?.classList.toggle('active', +v === w));
-}
+  // Summary card
+  html += `<div class="card">
+    <div class="card-row"><span style="color:var(--txt2)">기준 일자</span><span style="font-weight:600">${fmtDate(latest.date)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">총 평가금액</span><span style="font-weight:700">${fmtFull(totalVal)}</span></div>
+    <div class="card-row">
+      <span style="color:var(--txt2)">목표 비중 합계</span>
+      <span id="rebal-total-weight" style="font-weight:600;color:${weightOk ? 'var(--green)' : 'var(--red)'}">
+        ${totalTarget.toFixed(1)}% ${weightOk ? '✓' : '⚠️ 합계 100% 맞춰주세요'}
+      </span>
+    </div>
+  </div>`;
 
-function undoLast()     { if (drawings.length) { drawings.pop(); draw(); } }
-function clearDrawings(){ drawings = []; draw(); }
-
-function resetPlayers() {
-  PLAYERS.A1.x = 0.25; PLAYERS.A1.y = 0.25;
-  PLAYERS.A2.x = 0.25; PLAYERS.A2.y = 0.75;
-  PLAYERS.B1.x = 0.75; PLAYERS.B1.y = 0.25;
-  PLAYERS.B2.x = 0.75; PLAYERS.B2.y = 0.75;
-  SHUTTLE.x = 0.5; SHUTTLE.y = 0.5;
-  clearTokenSelection();
-  draw();
-}
-
-function addScore(t, v) {
-  scores[t] = Math.max(0, scores[t] + v);
-  document.getElementById('score-'+t).textContent = scores[t];
-  draw();
-}
-
-function resetScores() {
-  scores.a = 0; scores.b = 0;
-  document.getElementById('score-a').textContent = '0';
-  document.getElementById('score-b').textContent = '0';
-  draw();
-}
-
-function toggleServe() {
-  serveTeam = serveTeam === 'a' ? 'b' : 'a';
-  document.getElementById('shuttle-indicator').style.borderColor =
-    serveTeam === 'a' ? '#e94560' : '#00d4ff';
-}
-
-function setFormation(type) {
-  drawings = [];
-  const a = [];
-
-  if (type === 'front-back') {
-    PLAYERS.A1.x = 0.38; PLAYERS.A1.y = 0.5;
-    PLAYERS.A2.x = 0.15; PLAYERS.A2.y = 0.5;
-    PLAYERS.B1.x = 0.62; PLAYERS.B1.y = 0.5;
-    PLAYERS.B2.x = 0.85; PLAYERS.B2.y = 0.5;
-  } else if (type === 'side-by-side') {
-    PLAYERS.A1.x = 0.25; PLAYERS.A1.y = 0.3;
-    PLAYERS.A2.x = 0.25; PLAYERS.A2.y = 0.7;
-    PLAYERS.B1.x = 0.75; PLAYERS.B1.y = 0.3;
-    PLAYERS.B2.x = 0.75; PLAYERS.B2.y = 0.7;
-  } else if (type === 'attack') {
-    PLAYERS.A1.x = 0.4;  PLAYERS.A1.y = 0.3;
-    PLAYERS.A2.x = 0.4;  PLAYERS.A2.y = 0.7;
-    PLAYERS.B1.x = 0.65; PLAYERS.B1.y = 0.5;
-    PLAYERS.B2.x = 0.82; PLAYERS.B2.y = 0.5;
-    [['A1',0.49,0.3],['A2',0.49,0.7]].forEach(([k,tx,ty]) => {
-      const s = c2s(PLAYERS[k].x, PLAYERS[k].y), t2 = c2s(tx, ty);
-      a.push({ type:'arrow', x1:s.x, y1:s.y, x2:t2.x, y2:t2.y, color:'#ffdd57', width:3 });
+  // Weight bar (target weights)
+  if (totalTarget > 0) {
+    html += `<div class="section-header">목표 배분</div>
+    <div class="card" style="padding:16px">
+      <div style="display:flex;height:12px;border-radius:6px;overflow:hidden;gap:2px;margin-bottom:12px">`;
+    assets.forEach((a, i) => {
+      const w = weights[a.name] || 0;
+      if (w > 0) html += `<div style="flex:${w};background:${colors[i % colors.length]};min-width:2px"></div>`;
     });
-  } else if (type === 'defense') {
-    PLAYERS.A1.x = 0.18; PLAYERS.A1.y = 0.28;
-    PLAYERS.A2.x = 0.18; PLAYERS.A2.y = 0.72;
-    PLAYERS.B1.x = 0.82; PLAYERS.B1.y = 0.28;
-    PLAYERS.B2.x = 0.82; PLAYERS.B2.y = 0.72;
-  } else if (type === 'rotate') {
-    PLAYERS.A1.x = 0.32; PLAYERS.A1.y = 0.3;
-    PLAYERS.A2.x = 0.18; PLAYERS.A2.y = 0.7;
-    PLAYERS.B1.x = 0.68; PLAYERS.B1.y = 0.3;
-    PLAYERS.B2.x = 0.82; PLAYERS.B2.y = 0.7;
-    [['A1','A2'],['A2','A1'],['B1','B2'],['B2','B1']].forEach(([f, t2]) => {
-      const s = c2s(PLAYERS[f].x, PLAYERS[f].y), e2 = c2s(PLAYERS[t2].x, PLAYERS[t2].y);
-      a.push({ type:'arrow', x1:s.x, y1:s.y, x2:e2.x, y2:e2.y, color:'#a29bfe', width:3 });
+    html += `</div>`;
+    assets.forEach((a, i) => {
+      const w = weights[a.name] || 0;
+      if (w <= 0) return;
+      html += `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <div style="width:12px;height:12px;border-radius:3px;background:${colors[i % colors.length]};flex-shrink:0"></div>
+        <div style="flex:1;font-size:13px">${a.name}</div>
+        <div style="font-size:12px;font-weight:600">${w}%</div>
+      </div>`;
     });
+    html += `</div>`;
   }
 
-  drawings = a;
-  clearTokenSelection();
-  draw();
+  // Asset list with editable target weights
+  html += `<div class="section-header">종목별 비중 설정</div><div class="card">`;
+  assets.forEach((a, idx) => {
+    const curPct = totalVal > 0 ? (a.evalAmount / totalVal) * 100 : 0;
+    const targetPct = weights[a.name] || 0;
+    const dev = curPct - targetPct;
+    const hasTgt = targetPct > 0;
+    const devCls = hasTgt ? (Math.abs(dev) < 2 ? 'badge-ok' : dev > 0 ? 'badge-over' : 'badge-buy') : 'badge-over';
+    const devTxt = hasTgt ? `${Math.abs(dev) < 2 ? '균형' : dev > 0 ? '초과' : '부족'} ${sign(dev)}${Math.abs(dev).toFixed(1)}%` : '미설정';
+    html += `<div style="padding:12px 16px;border-bottom:0.5px solid var(--sep)" data-name="${a.name}">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <div style="font-size:15px;font-weight:500">${a.name}</div>
+        <span id="rebal-badge-${idx}" class="badge ${devCls}">${devTxt}</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:12px;color:var(--txt2)">${fmtFull(a.evalAmount)} · 현재 ${curPct.toFixed(1)}%</div>
+        <div style="display:flex;align-items:center;gap:6px">
+          <span style="font-size:12px;color:var(--txt2)">목표</span>
+          <input type="number" min="0" max="100" step="1" value="${targetPct || ''}"
+            placeholder="0"
+            style="width:56px;text-align:right;background:var(--bg3);border:none;border-radius:8px;padding:4px 8px;color:var(--txt);font-size:14px;font-family:inherit;outline:none"
+            data-idx="${idx}" data-cur="${curPct.toFixed(4)}"
+            oninput="updateTargetWeightEl(this)">
+          <span style="font-size:12px;color:var(--txt2)">%</span>
+        </div>
+      </div>
+    </div>`;
+  });
+  html += `</div>`;
+
+  html += `<div class="btn-wrap">
+    <button class="btn btn-primary" onclick="openCalcModal()">리밸런싱 계산하기</button>
+  </div>
+  <div class="btn-wrap" style="padding-top:0">
+    <button class="btn btn-secondary" onclick="setEqualWeights()">균등 배분 자동 설정</button>
+  </div>
+  <div style="height:8px"></div>`;
+
+  el.innerHTML = html;
 }
 
-window.addEventListener('resize', resize);
-resize();
+function updateTargetWeightEl(input) {
+  const row = input.closest('[data-name]');
+  const name = row ? row.dataset.name : null;
+  const idx = parseInt(input.dataset.idx, 10);
+  const curPct = parseFloat(input.dataset.cur) || 0;
+  if (!name) return;
+  if (!settings.targetWeights) settings.targetWeights = {};
+  settings.targetWeights[name] = parseFloat(input.value) || 0;
+  LS.set('settings', settings);
+
+  const latest = enrich(sortedRecords())[0];
+  if (!latest) return;
+  let total = 0;
+  (latest.assets || []).forEach(a => total += (settings.targetWeights[a.name] || 0));
+  const weightOk = Math.abs(total - 100) < 0.5;
+  const totalEl = document.getElementById('rebal-total-weight');
+  if (totalEl) {
+    totalEl.textContent = total.toFixed(1) + '% ' + (weightOk ? '✓' : '⚠️ 합계 100% 맞춰주세요');
+    totalEl.style.color = weightOk ? 'var(--green)' : 'var(--red)';
+  }
+
+  const targetPct = settings.targetWeights[name] || 0;
+  const dev = curPct - targetPct;
+  const hasTgt = targetPct > 0;
+  const devCls = hasTgt ? (Math.abs(dev) < 2 ? 'badge-ok' : dev > 0 ? 'badge-over' : 'badge-buy') : 'badge-over';
+  const devTxt = hasTgt ? (Math.abs(dev) < 2 ? '균형' : dev > 0 ? '초과' : '부족') + ' ' + sign(dev) + Math.abs(dev).toFixed(1) + '%' : '미설정';
+  const badge = document.getElementById('rebal-badge-' + idx);
+  if (badge) { badge.className = 'badge ' + devCls; badge.textContent = devTxt; }
+}
+
+function setEqualWeights() {
+  const latest = enrich(sortedRecords())[0];
+  if (!latest || !latest.assets.length) return;
+  const assets = latest.assets;
+  const base = Math.floor(100 / assets.length);
+  const extra = 100 - base * assets.length;
+  if (!settings.targetWeights) settings.targetWeights = {};
+  assets.forEach((a, i) => { settings.targetWeights[a.name] = base + (i === 0 ? extra : 0); });
+  LS.set('settings', settings);
+  renderRebal();
+}
+
+function openCalcModal() {
+  document.getElementById('calc-amount').value = '';
+  document.getElementById('calc-results').innerHTML = '';
+  openModal('calc-modal');
+}
+
+function runRebalCalc() {
+  const additional = parseFloat(document.getElementById('calc-amount').value) || 0;
+  if (additional <= 0) { toast('투자금액을 입력해주세요'); return; }
+
+  const latest = enrich(sortedRecords())[0];
+  if (!latest) { toast('자산 기록이 없습니다'); return; }
+
+  const assets = latest.assets || [];
+  const weights = settings.targetWeights || {};
+  const totalCur = latest.totalValue;
+  const newTotal = totalCur + additional;
+
+  const prepared = assets.map(a => {
+    const targetPct = weights[a.name] || 0;
+    const targetKRW = (targetPct / 100) * newTotal;
+    const curKRW = a.evalAmount;
+    const deficit = Math.max(0, targetKRW - curKRW);
+    // Estimate current price per share from evalAmount / qty
+    const currentPrice = a.qty > 0 ? Math.round(a.evalAmount / a.qty) : (a.avgPrice || 0);
+    return { name: a.name, targetPct, targetKRW, curKRW, deficit, currentPrice };
+  });
+
+  const totalDeficit = prepared.reduce((s, d) => s + d.deficit, 0);
+
+  const results = prepared.map(d => {
+    let buyKRW = 0;
+    if (d.deficit > 0) {
+      buyKRW = totalDeficit <= additional ? d.deficit : additional * (d.deficit / totalDeficit);
+    }
+    const buyQty = d.currentPrice > 0 ? Math.floor(buyKRW / d.currentPrice) : 0;
+    const actualBuy = buyQty * d.currentPrice;
+    return { ...d, buyQty, actualBuy };
+  });
+
+  const spent = results.reduce((s, r) => s + r.actualBuy, 0);
+  const leftover = additional - spent;
+
+  let html = `<div class="section-header" style="margin-top:4px">매수 추천</div><div class="card">`;
+  results.forEach(r => {
+    if (r.targetPct === 0) return;
+    if (r.deficit <= 0) {
+      html += `<div class="card-row"><div><div style="font-weight:500">${r.name}</div><div style="font-size:12px;color:var(--txt2)">초과 보유 — 매수 불필요</div></div><span class="badge badge-ok">보유중</span></div>`;
+    } else if (r.buyQty > 0) {
+      html += `<div class="card-row">
+        <div><div style="font-weight:500">${r.name}</div>
+        <div style="font-size:12px;color:var(--txt2);margin-top:2px">${r.buyQty}주 × ${r.currentPrice.toLocaleString()}원</div></div>
+        <div style="text-align:right"><div style="font-weight:700;color:var(--red)">${fmtFull(r.actualBuy)}</div>
+        <div style="font-size:12px;color:var(--txt2)">${r.buyQty}주</div></div>
+      </div>`;
+    } else {
+      html += `<div class="card-row"><div><div style="font-weight:500">${r.name}</div><div style="font-size:12px;color:var(--txt2)">부족 — 1주 매수 불가</div></div><span class="badge badge-buy">부족</span></div>`;
+    }
+  });
+  html += `</div>
+  <div class="card" style="margin-top:8px">
+    <div class="card-row"><span style="color:var(--txt2)">추가 투자금</span><span>${fmtFull(additional)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">투자 후 총액</span><span style="font-weight:600">${fmtFull(newTotal)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">사용금액</span><span style="font-weight:600">${fmtFull(spent)}</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">잔여금</span><span style="color:var(--green);font-weight:600">${fmtFull(leftover)}</span></div>
+  </div>`;
+
+  document.getElementById('calc-results').innerHTML = html;
+}
+
+// ═══════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════
+function renderSettings() {
+  const el = document.getElementById('settings-content');
+  let html = `<div style="height:8px"></div>
+  <div class="section-header">환율 알림</div>
+  <div class="card">
+    <div class="card-row">
+      <span>환율 알림</span>
+      <label class="setting-toggle">
+        <input class="toggle-input" type="checkbox" ${settings.alertEnabled ? 'checked' : ''} onchange="toggleAlert(this.checked)">
+        <span class="toggle-slider"></span>
+      </label>
+    </div>
+    <div class="form-group">
+      <span class="form-label">알림 기준</span>
+      <input class="form-input" type="number" value="${settings.alertThreshold}" onchange="updateAlertThreshold(this.value)" placeholder="1300">
+      <span style="font-size:14px;color:var(--txt2)">원 이하</span>
+    </div>
+  </div>
+
+  <div class="section-header">데이터</div>
+  <div class="card">
+    <div class="card-row" style="cursor:pointer" onclick="exportData()">
+      <span>데이터 내보내기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+    <div class="card-row" style="cursor:pointer" onclick="importData()">
+      <span>데이터 불러오기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+    <div class="card-row" style="cursor:pointer" onclick="confirmDeleteAll()">
+      <span style="color:var(--red)">모든 기록 삭제</span>
+      <span style="color:var(--txt2)">›</span>
+    </div>
+  </div>
+
+  <div class="section-header">샘플 데이터</div>
+  <div class="card">
+    <div class="card-row" style="cursor:pointer" onclick="loadSamplePortfolio()">
+      <span>샘플 포트폴리오 불러오기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+    <div class="card-row" style="cursor:pointer" onclick="loadSampleRecords()">
+      <span>샘플 자산 기록 불러오기</span>
+      <span style="color:var(--blue)">›</span>
+    </div>
+  </div>
+
+  <div class="section-header">앱 정보</div>
+  <div class="card">
+    <div class="card-row"><span style="color:var(--txt2)">버전</span><span>1.0.0</span></div>
+    <div class="card-row"><span style="color:var(--txt2)">환율 출처</span><span>Frankfurter API</span></div>
+  </div>
+  <div style="height:8px"></div>`;
+  el.innerHTML = html;
+}
+
+function updatePortfolioName(v) {
+  portfolio.name = v;
+  LS.set('portfolio', portfolio);
+}
+function toggleAlert(v) {
+  settings.alertEnabled = v;
+  LS.set('settings', settings);
+  if (v && 'Notification' in window) {
+    Notification.requestPermission().then(p => {
+      if (p !== 'granted') toast('알림 권한이 필요합니다 (설정 → Safari → 알림 허용)');
+    });
+  }
+}
+function updateAlertThreshold(v) {
+  settings.alertThreshold = parseFloat(v) || 1300;
+  LS.set('settings', settings);
+}
+function confirmDeleteAll() {
+  if (confirm('모든 자산 기록을 삭제하시겠습니까? 포트폴리오는 유지됩니다.')) {
+    scanRecords = [];
+    save();
+    renderDashboard();
+    renderRecords();
+    toast('삭제되었습니다');
+  }
+}
+function exportData() {
+  const data = { scanRecords, portfolio, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'asset-scanner-backup.json';
+  a.click();
+  toast('내보내기 완료');
+}
+function importData() {
+  const input = document.createElement('input');
+  input.type = 'file'; input.accept = '.json';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    const reader = new FileReader();
+    reader.onload = ev => {
+      try {
+        const data = JSON.parse(ev.target.result);
+        if (data.scanRecords) scanRecords = data.scanRecords;
+        if (data.portfolio)   portfolio   = data.portfolio;
+        save();
+        renderDashboard(); renderRecords(); renderRebal(); renderSettings();
+        toast('불러오기 완료');
+      } catch { toast('파일 형식이 올바르지 않습니다'); }
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+function loadSamplePortfolio() {
+  portfolio.assets = [
+    { id: uuid(), name: 'TIGER 미국S&P500', symbol: '379800', currency: 'KRW', targetWeight: 40, price: 16800, qty: 150, category: '해외주식' },
+    { id: uuid(), name: 'TIGER 나스닥100',   symbol: '133690', currency: 'KRW', targetWeight: 25, price: 84500, qty: 25,  category: '해외주식' },
+    { id: uuid(), name: 'TIGER 국채10년',    symbol: '148070', currency: 'KRW', targetWeight: 20, price: 48200, qty: 35,  category: '채권' },
+    { id: uuid(), name: 'KODEX 골드선물',    symbol: '132030', currency: 'KRW', targetWeight: 10, price: 14300, qty: 40,  category: '금' },
+    { id: uuid(), name: 'TIGER 현금성자산',  symbol: '190620', currency: 'KRW', targetWeight: 5,  price: 100150, qty: 5,  category: '현금' }
+  ];
+  LS.set('portfolio', portfolio);
+  renderRebal();
+  switchTab('rebal', document.querySelectorAll('.tab-item')[2]);
+  toast('샘플 포트폴리오 로드 완료');
+}
+
+function loadSampleRecords() {
+  const today = new Date();
+  const offsets = [-5,-4,-3,-2,-1,0];
+  const prices = [
+    [68000,130000,192000],
+    [71000,135000,195000],
+    [72500,138000,197000],
+    [71800,136500,198500],
+    [73200,140000,201000],
+    [74500,142000,199000]
+  ];
+  scanRecords = offsets.map((d, i) => {
+    const date = new Date(today); date.setDate(date.getDate() + d);
+    const mk = (name, qty, avgPrice, price) => ({
+      name, symbol: '', qty, avgPrice,
+      buyAmount: qty * avgPrice, evalAmount: qty * price
+    });
+    return {
+      id: uuid(),
+      date: date.toISOString().split('T')[0],
+      assets: [
+        mk('삼성전자', 10, 70000, prices[i][0]),
+        mk('SK하이닉스', 5, 130000, prices[i][1]),
+        mk('NAVER', 3, 200000, prices[i][2])
+      ]
+    };
+  });
+  save();
+  renderDashboard(); renderRecords();
+  switchTab('dashboard', document.querySelectorAll('.tab-item')[0]);
+  toast('샘플 기록 로드 완료');
+}
+
+// ═══════════════════════════════════════════
+//  EXCHANGE RATE  (다중 소스 폴백)
+// ═══════════════════════════════════════════
+const RATE_SOURCES = [
+  // 1차: Frankfurter (ECB 기반, 무료·CORS 허용)
+  async () => {
+    const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=KRW');
+    const data = await res.json();
+    const rate = data.rates?.KRW;
+    if (!rate) throw new Error('no KRW');
+    return { rate, source: 'Frankfurter' };
+  },
+  // 2차: fawazahmed0 Currency API (jsDelivr CDN, 항상 접근 가능)
+  async () => {
+    const res = await fetch('https://cdn.jsdelivr.net/npm/@fawazahmed0/currency-api@latest/v1/currencies/usd.json');
+    const data = await res.json();
+    const rate = data.usd?.krw;
+    if (!rate) throw new Error('no KRW');
+    return { rate: Math.round(rate), source: 'CDN(fawazahmed0)' };
+  },
+  // 3차: Open Exchange Rates (무료 플랜, 시간 1회 제한)
+  async () => {
+    const res = await fetch('https://open.er-api.com/v6/latest/USD');
+    const data = await res.json();
+    const rate = data.rates?.KRW;
+    if (!rate) throw new Error('no KRW');
+    return { rate: Math.round(rate), source: 'open.er-api' };
+  }
+];
+
+async function fetchRate() {
+  for (const fn of RATE_SOURCES) {
+    try {
+      const { rate, source } = await fn();
+      usdKrw = rate;
+      usdKrwTime = new Date().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }) + ' (' + source + ')';
+      if (settings.alertEnabled && rate <= settings.alertThreshold && 'Notification' in window && Notification.permission === 'granted') {
+        new Notification('환율 알림', { body: `USD/KRW ${rate.toFixed(0)}원 (기준 ${settings.alertThreshold}원 이하)`, icon: 'icon.svg' });
+      }
+      if (document.getElementById('screen-rebal').classList.contains('active')) renderRebal();
+      return;
+    } catch (e) {
+      console.log('환율 소스 실패, 다음 시도:', e.message);
+    }
+  }
+  console.log('모든 환율 소스 실패');
+}
+
+// ═══════════════════════════════════════════
+//  MODAL HELPERS
+// ═══════════════════════════════════════════
+function openModal(id) {
+  document.getElementById(id).classList.add('open');
+  document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+  document.body.style.overflow = '';
+}
+
+// Close on backdrop tap
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if (e.target === el) closeModal(el.id); });
+});
+
+// ═══════════════════════════════════════════
+//  TOAST
+// ═══════════════════════════════════════════
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ═══════════════════════════════════════════
+//  SERVICE WORKER
+// ═══════════════════════════════════════════
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(() => {});
+}
+
+// ═══════════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════════
+function init() {
+  // Load sample data on first run
+  if (!localStorage.getItem('scanRecords') && !localStorage.getItem('portfolio')) {
+    loadSampleRecords();
+    loadSamplePortfolio();
+    return; // switchTab called inside
+  }
+  renderDashboard();
+  fetchRate();
+  // Refresh rate every 30 minutes
+  setInterval(fetchRate, 30 * 60 * 1000);
+}
+
+init();
 </script>
 </body>
 </html>
