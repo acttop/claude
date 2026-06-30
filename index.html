@@ -901,6 +901,48 @@ function loadTesseract() {
   return tesseractLoading;
 }
 
+// OCR 전처리: 다크모드 반전 + 대비 강화 + 확대
+// Tesseract는 흰 배경에 검은 글자를 가장 잘 읽음
+function preprocessForOCR(dataURL) {
+  return new Promise(resolve => {
+    const img = new Image();
+    img.onload = () => {
+      const MAX_DIM = 2400;
+      const scale = Math.min(3, Math.max(1, MAX_DIM / Math.max(img.width, img.height)));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const id = ctx.getImageData(0, 0, w, h);
+      const d = id.data;
+
+      // 배경 밝기 샘플링 (상단 10% 픽셀의 평균)
+      let sumBright = 0, cnt = 0;
+      const sampleRows = Math.max(1, Math.floor(h * 0.1));
+      for (let i = 0; i < sampleRows * w * 4; i += 4) {
+        sumBright += (d[i] * 299 + d[i+1] * 587 + d[i+2] * 114) / 1000;
+        cnt++;
+      }
+      const isDark = sumBright / cnt < 128; // 다크 배경 감지
+
+      for (let i = 0; i < d.length; i += 4) {
+        let gray = (d[i] * 299 + d[i+1] * 587 + d[i+2] * 114) / 1000;
+        if (isDark) gray = 255 - gray; // 다크모드 반전
+        // 대비 강화 (1.6배 + 중간점 조정)
+        gray = Math.min(255, Math.max(0, (gray - 128) * 1.6 + 128));
+        d[i] = d[i+1] = d[i+2] = gray;
+        // d[i+3] (alpha) 유지
+      }
+      ctx.putImageData(id, 0, 0);
+      resolve(canvas.toDataURL('image/png'));
+    };
+    img.src = dataURL;
+  });
+}
+
 let ocrWorker = null;
 async function getOcrWorker(statusEl) {
   if (ocrWorker) return ocrWorker;
@@ -915,16 +957,22 @@ async function getOcrWorker(statusEl) {
       }
     }
   });
+  // Tesseract 파라미터: 단일 블록 레이아웃(PSM6) + 단어 간격 보존
+  await ocrWorker.setParameters({
+    tessedit_pageseg_mode: '6',
+    preserve_interword_spaces: '1',
+  });
   return ocrWorker;
 }
 
 async function runOCR(dataURL) {
   const statusEl = document.getElementById('ocr-status');
   statusEl.style.display = 'block';
-  statusEl.textContent = '준비 중...';
+  statusEl.textContent = '이미지 처리 중...';
   try {
+    const processed = await preprocessForOCR(dataURL);
     const worker = await getOcrWorker(statusEl);
-    const { data } = await worker.recognize(dataURL);
+    const { data } = await worker.recognize(processed);
     const parsed = parseAssetsFromText(data.text);
     statusEl.style.display = 'none';
     if (!parsed.length) {
@@ -939,10 +987,30 @@ async function runOCR(dataURL) {
   }
 }
 
+// OCR 결과에서 ETF 브랜드명 복원 (Tesseract가 자주 틀리는 패턴 교정)
+function fixEtfBrands(text) {
+  // 각 줄별로 처리: ETF 브랜드 앞에 붙은 OCR 쓰레기를 제거하고 브랜드명 복원
+  const brands = [
+    // [정규식 패턴, 올바른 브랜드]
+    [/[^A-Z가-힣\n]*T[1lI]G[E3][Rr]\b/g, 'TIGER'],
+    [/[^A-Z가-힣\n]*K[O0]D[E3]X\b/g, 'KODEX'],
+    [/[^A-Z가-힣\n]*R[1lI][S5][E3]\b/g, 'RISE'],
+    [/[^A-Z가-힣\n]*K[1lI]ND[E3]X\b/g, 'KINDEX'],
+    [/[^A-Z가-힣\n]*HAN[AΛ]R[O0]\b/g, 'HANARO'],
+    [/[^A-Z가-힣\n]*K[O0][S5][E3]F\b/g, 'KOSEF'],
+    [/[^A-Z가-힣\n]*[S5][O0]L\b(?=\s+[가-힣A-Z])/g, 'SOL'],
+    [/[^A-Z가-힣\n]*ACE\b/g, 'ACE'],
+    [/[^A-Z가-힣\n]*AR[1lI]RANG\b/g, 'ARIRANG'],
+  ];
+  let result = text;
+  brands.forEach(([re, brand]) => { result = result.replace(re, brand); });
+  return result;
+}
+
 // OCR 텍스트 파싱 — 라벨 구조 → 컴팩트 잔고 목록 → 일반 휴리스틱 순으로 시도
 function parseAssetsFromText(text) {
   // HTML 엔티티 및 인코딩 정규화 (&amp; → &, 전각 & → &)
-  const normalized = text.replace(/&amp;/g, '&').replace(/＆/g, '&');
+  const normalized = fixEtfBrands(text.replace(/&amp;/g, '&').replace(/＆/g, '&'));
   const lines = normalized.split('\n').map(l => l.trim()).filter(Boolean);
   const structured = parseStructuredBlocks(lines);
   if (structured.length) return structured;
