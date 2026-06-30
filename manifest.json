@@ -1,33 +1,21 @@
 {
-  "name": "배드민턴 복식 전략보드",
-  "short_name": "배드민턴전략",
-  "description": "배드민턴 복식 경기 전략 수립을 위한 인터랙티브 보드",
+  "name": "자산 스캐너",
+  "short_name": "자산스캐너",
+  "description": "자산현황 관리 및 ETF 리밸런싱 도우미",
   "start_url": "./index.html",
   "display": "standalone",
-  "orientation": "landscape",
-  "background_color": "#0f0f1a",
-  "theme_color": "#e94560",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "portrait",
   "lang": "ko",
   "icons": [
     {
-      "src": "icons/icon.svg",
+      "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
-    },
-    {
-      "src": "icons/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "icons/icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
     }
   ],
-  "screenshots": [],
-  "categories": ["games", "entertainment"]
+  "apple-mobile-web-app-capable": "yes",
+  "apple-mobile-web-app-status-bar-style": "black-translucent"
 }
