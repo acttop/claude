@@ -1312,7 +1312,7 @@ function renderRebal() {
     const hasTgt = targetPct > 0;
     const devCls = hasTgt ? (Math.abs(dev) < 2 ? 'badge-ok' : dev > 0 ? 'badge-over' : 'badge-buy') : 'badge-over';
     const devTxt = hasTgt ? `${Math.abs(dev) < 2 ? '균형' : dev > 0 ? '초과' : '부족'} ${sign(dev)}${Math.abs(dev).toFixed(1)}%` : '미설정';
-    html += `<div style="padding:12px 16px;border-bottom:0.5px solid var(--sep)">
+    html += `<div style="padding:12px 16px;border-bottom:0.5px solid var(--sep)" data-name="${a.name}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
         <div style="font-size:15px;font-weight:500">${a.name}</div>
         <span id="rebal-badge-${idx}" class="badge ${devCls}">${devTxt}</span>
@@ -1324,7 +1324,8 @@ function renderRebal() {
           <input type="number" min="0" max="100" step="1" value="${targetPct || ''}"
             placeholder="0"
             style="width:56px;text-align:right;background:var(--bg3);border:none;border-radius:8px;padding:4px 8px;color:var(--txt);font-size:14px;font-family:inherit;outline:none"
-            oninput="updateTargetWeight('${a.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}',this.value,${idx},${curPct.toFixed(4)})">
+            data-idx="${idx}" data-cur="${curPct.toFixed(4)}"
+            oninput="updateTargetWeightEl(this)">
           <span style="font-size:12px;color:var(--txt2)">%</span>
         </div>
       </div>
@@ -1343,12 +1344,16 @@ function renderRebal() {
   el.innerHTML = html;
 }
 
-function updateTargetWeight(name, val, idx, curPct) {
+function updateTargetWeightEl(input) {
+  const row = input.closest('[data-name]');
+  const name = row ? row.dataset.name : null;
+  const idx = parseInt(input.dataset.idx, 10);
+  const curPct = parseFloat(input.dataset.cur) || 0;
+  if (!name) return;
   if (!settings.targetWeights) settings.targetWeights = {};
-  settings.targetWeights[name] = parseFloat(val) || 0;
+  settings.targetWeights[name] = parseFloat(input.value) || 0;
   LS.set('settings', settings);
 
-  // Update total weight display without re-rendering
   const latest = enrich(sortedRecords())[0];
   if (!latest) return;
   let total = 0;
@@ -1356,18 +1361,17 @@ function updateTargetWeight(name, val, idx, curPct) {
   const weightOk = Math.abs(total - 100) < 0.5;
   const totalEl = document.getElementById('rebal-total-weight');
   if (totalEl) {
-    totalEl.textContent = `${total.toFixed(1)}% ${weightOk ? '✓' : '⚠️ 합계 100% 맞춰주세요'}`;
+    totalEl.textContent = total.toFixed(1) + '% ' + (weightOk ? '✓' : '⚠️ 합계 100% 맞춰주세요');
     totalEl.style.color = weightOk ? 'var(--green)' : 'var(--red)';
   }
 
-  // Update badge for this specific asset
   const targetPct = settings.targetWeights[name] || 0;
   const dev = curPct - targetPct;
   const hasTgt = targetPct > 0;
   const devCls = hasTgt ? (Math.abs(dev) < 2 ? 'badge-ok' : dev > 0 ? 'badge-over' : 'badge-buy') : 'badge-over';
-  const devTxt = hasTgt ? `${Math.abs(dev) < 2 ? '균형' : dev > 0 ? '초과' : '부족'} ${sign(dev)}${Math.abs(dev).toFixed(1)}%` : '미설정';
-  const badge = document.getElementById(`rebal-badge-${idx}`);
-  if (badge) { badge.className = `badge ${devCls}`; badge.textContent = devTxt; }
+  const devTxt = hasTgt ? (Math.abs(dev) < 2 ? '균형' : dev > 0 ? '초과' : '부족') + ' ' + sign(dev) + Math.abs(dev).toFixed(1) + '%' : '미설정';
+  const badge = document.getElementById('rebal-badge-' + idx);
+  if (badge) { badge.className = 'badge ' + devCls; badge.textContent = devTxt; }
 }
 
 function setEqualWeights() {
