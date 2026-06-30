@@ -1,0 +1,37 @@
+name: asset_rebalancing
+description: "개인 자산 포트폴리오 리밸런싱 앱 (offline-first, iPhone 우선)"
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.5.0 <4.0.0"
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  cupertino_icons: ^1.0.6
+
+  # 상태관리
+  flutter_riverpod: ^2.5.1
+
+  # 로컬 영구 저장소 (SQLite)
+  sqflite: ^2.3.3
+  path: ^1.9.0
+  path_provider: ^2.1.3
+
+  # 차트
+  fl_chart: ^0.68.0
+
+  # 숫자/통화 포맷
+  intl: ^0.19.0
+
+  # 클립보드/공유는 flutter/services 기본 포함
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^4.0.0
+
+flutter:
+  uses-material-design: true
