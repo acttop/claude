@@ -39,7 +39,8 @@ jobs:
           cd asset_rebalancing
           flutter create --platforms=web .
           flutter pub get
-          flutter build web --release --base-href /claude/rebalancing/
+          # 서비스워커 비활성화(--pwa-strategy=none): 재배포 시 캐시로 인한 빈 화면 방지
+          flutter build web --release --pwa-strategy=none --base-href /claude/rebalancing/
 
       - name: Publish build to ${{ env.PAGES_BRANCH }} under rebalancing/
         run: |
