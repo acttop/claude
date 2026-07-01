@@ -23,6 +23,7 @@ class _RebalanceScreenState extends ConsumerState<RebalanceScreen> {
   final _investCtrl = TextEditingController(text: '0');
   final Map<String, double> _weights = {}; // assetId -> target weight (override)
   bool _initialized = false;
+  Key _weightEditorKey = UniqueKey(); // 리셋 시 입력 필드 재생성용
 
   @override
   void dispose() {
@@ -32,10 +33,26 @@ class _RebalanceScreenState extends ConsumerState<RebalanceScreen> {
 
   void _initWeights(List<Asset> assets) {
     if (_initialized) return;
+    // 기본값은 "현재 자산 비중"으로 초기화 (합계 자동 100%). 여기서 조정해 리밸런싱.
+    final total = assets.fold<double>(0, (s, a) => s + a.currentValue);
     for (final a in assets) {
-      _weights[a.id] = a.targetWeight;
+      _weights[a.id] =
+          total > 0 ? a.currentValue / total * 100 : a.targetWeight;
     }
     _initialized = true;
+  }
+
+  void _resetWeights(List<Asset> assets, {required bool toCurrent}) {
+    final total = assets.fold<double>(0, (s, a) => s + a.currentValue);
+    setState(() {
+      for (final a in assets) {
+        _weights[a.id] = toCurrent
+            ? (total > 0 ? a.currentValue / total * 100 : 0)
+            : a.targetWeight;
+      }
+      // 입력 필드가 새 값을 반영하도록 위젯 트리를 다시 만든다.
+      _weightEditorKey = UniqueKey();
+    });
   }
 
   double get _additional => Fmt.parseNumber(_investCtrl.text) ?? 0;
@@ -172,6 +189,29 @@ class _RebalanceScreenState extends ConsumerState<RebalanceScreen> {
                 ),
               ],
             ),
+            Row(
+              children: [
+                TextButton.icon(
+                  icon: const Icon(Icons.pie_chart_outline, size: 16),
+                  label: const Text('현재 비중', style: TextStyle(fontSize: 12)),
+                  onPressed: () => _resetWeights(assets, toCurrent: true),
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                ),
+                TextButton.icon(
+                  icon: const Icon(Icons.flag_outlined, size: 16),
+                  label:
+                      const Text('저장된 목표', style: TextStyle(fontSize: 12)),
+                  onPressed: () => _resetWeights(assets, toCurrent: false),
+                  style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      minimumSize: Size.zero,
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap),
+                ),
+              ],
+            ),
             const Divider(),
             ...assets.map((a) {
               return Padding(
@@ -182,6 +222,7 @@ class _RebalanceScreenState extends ConsumerState<RebalanceScreen> {
                     SizedBox(
                       width: 90,
                       child: TextFormField(
+                        key: ValueKey('$_weightEditorKey-${a.id}'),
                         initialValue:
                             (_weights[a.id] ?? a.targetWeight).toStringAsFixed(1),
                         keyboardType: const TextInputType.numberWithOptions(
