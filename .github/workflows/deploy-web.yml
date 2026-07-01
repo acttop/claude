@@ -41,6 +41,13 @@ jobs:
           flutter pub get
           # 서비스워커 비활성화(--pwa-strategy=none): 재배포 시 캐시로 인한 빈 화면 방지
           flutter build web --release --pwa-strategy=none --base-href /claude/rebalancing/
+          # 캐시 무효화: 커밋 SHA를 쿼리로 붙여 브라우저가 항상 최신 번들을 받도록
+          BUST="${GITHUB_SHA:0:8}"
+          cd build/web
+          sed -i "s#flutter_bootstrap.js#flutter_bootstrap.js?v=${BUST}#g" index.html || true
+          sed -i "s#\"main\.dart\.js\"#\"main.dart.js?v=${BUST}\"#g" flutter_bootstrap.js || true
+          echo "--- index.html script tag ---"; grep -o "flutter_bootstrap.js[^\"']*" index.html || true
+          echo "--- bootstrap main ref ---"; grep -o "main.dart.js[^\"']*" flutter_bootstrap.js | head -n1 || true
 
       - name: Publish build to ${{ env.PAGES_BRANCH }} under rebalancing/
         run: |
