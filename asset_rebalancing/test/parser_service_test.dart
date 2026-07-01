@@ -68,6 +68,33 @@ KODEX 200,국내주식,3000000,25
     });
   });
 
+  group('합계/요약 행 제외', () {
+    test('마크다운 표의 합계 행은 자산으로 등록하지 않는다', () {
+      const input = '''
+| 상품명 | 카테고리 | 평가금액 | 목표비중 |
+|---|---|---|---|
+| TIGER 200 | ETF | 30,351,800 | 40 |
+| TIGER 국채3년 | ETF | 12,551,400 | 60 |
+| 합계 | 기타 | 42,903,200 | 100 |
+''';
+      final r = ParserService.parse(input);
+      expect(r.assets.length, 2);
+      expect(r.assets.any((a) => a.name == '합계'), false);
+    });
+
+    test('총계/소계 등도 제외한다', () {
+      const input = '''
+상품명,카테고리,평가금액,목표비중
+TIGER 200,ETF,30000000,50
+소계,기타,30000000,50
+총계,기타,60000000,100
+''';
+      final r = ParserService.parse(input);
+      expect(r.assets.length, 1);
+      expect(r.assets.single.name, 'TIGER 200');
+    });
+  });
+
   group('오류 처리', () {
     test('빈 입력은 에러를 반환한다', () {
       final r = ParserService.parse('   ');

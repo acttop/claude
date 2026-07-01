@@ -129,6 +129,10 @@ class ParserService {
           errors.add('JSON ${i + 1}번째 항목에 상품명(name)이 없습니다.');
           continue;
         }
+        if (_isSummaryName(name)) {
+          errors.add('"$name" 은(는) 합계/요약 행으로 보여 제외했습니다.');
+          continue;
+        }
         final value = Fmt.parseNumber(
             (m['currentvalue'] ?? m['value'] ?? m['평가금액'])?.toString());
         final weight = Fmt.parseNumber(
@@ -243,6 +247,10 @@ class ParserService {
         errors.add('$lineNo번째 줄: 상품명이 비어 있어 건너뜀 → "${cells.join(' | ')}"');
         continue;
       }
+      if (_isSummaryName(name)) {
+        errors.add('$lineNo번째 줄: "$name" 은(는) 합계/요약 행으로 보여 제외했습니다.');
+        continue;
+      }
       final value = Fmt.parseNumber(at(valIdx));
       final weight = Fmt.parseNumber(at(weightIdx));
       if (value == null && weight == null) {
@@ -265,6 +273,20 @@ class ParserService {
     }
     return ParseResult(
         assets: assets, errors: errors, detectedFormat: format);
+  }
+
+  /// 합계/총계/소계 등 요약 행 이름인지 판별해 자산 등록에서 제외한다.
+  static bool _isSummaryName(String name) {
+    final n = name.replaceAll(' ', '').replaceAll('　', '').toLowerCase();
+    const exact = {
+      '합계', '총합계', '총계', '소계', '중계', '총합', '합산', '누계', '계',
+      'total', 'totals', 'sum', 'subtotal', 'grandtotal', '합',
+    };
+    if (exact.contains(n)) return true;
+    // "합계금액", "평가금액합계", "포트폴리오합계" 등
+    if (n.startsWith('합계') || n.endsWith('합계')) return true;
+    if (n.startsWith('총계') || n.endsWith('총계')) return true;
+    return false;
   }
 
   static bool _matchAny(String header, List<String> keys) =>
