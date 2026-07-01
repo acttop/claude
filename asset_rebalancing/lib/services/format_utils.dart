@@ -3,7 +3,6 @@ import 'package:intl/intl.dart';
 /// 숫자/통화 포맷 유틸
 class Fmt {
   static final NumberFormat _won = NumberFormat('#,##0', 'ko_KR');
-  static final NumberFormat _wonSigned = NumberFormat('+#,##0;-#,##0', 'ko_KR');
 
   /// 1234567 -> "₩1,234,567"
   static String won(num v) => '₩${_won.format(v.round())}';
@@ -11,7 +10,8 @@ class Fmt {
   /// 부호 포함. 1234 -> "+1,234", -1234 -> "-1,234"
   static String wonSigned(num v) {
     if (v == 0) return '0';
-    return _wonSigned.format(v.round());
+    final s = _won.format(v.abs().round());
+    return v > 0 ? '+$s' : '-$s';
   }
 
   /// 천 단위 콤마만 (기호 없음)

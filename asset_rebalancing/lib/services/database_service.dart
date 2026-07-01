@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:path/path.dart' as p;
 import 'package:sqflite/sqflite.dart';
 
@@ -23,8 +24,14 @@ class DatabaseService {
   }
 
   Future<Database> _open() async {
-    final dir = await getDatabasesPath();
-    final path = p.join(dir, _dbName);
+    // 웹에서는 파일시스템 경로 대신 DB 이름만 사용(IndexedDB에 저장)
+    final String path;
+    if (kIsWeb) {
+      path = _dbName;
+    } else {
+      final dir = await getDatabasesPath();
+      path = p.join(dir, _dbName);
+    }
     return openDatabase(
       path,
       version: _dbVersion,
