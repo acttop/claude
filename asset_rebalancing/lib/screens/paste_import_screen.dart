@@ -62,16 +62,28 @@ class _PasteImportScreenState extends ConsumerState<PasteImportScreen> {
     }
   }
 
+  bool _applying = false;
+
   Future<void> _apply() async {
-    final summary =
-        await ref.read(assetProvider.notifier).applyParsed(_result.assets);
-    if (mounted) {
+    if (_applying) return;
+    setState(() => _applying = true);
+    try {
+      final summary =
+          await ref.read(assetProvider.notifier).applyParsed(_result.assets);
+      if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
             content:
                 Text('신규 ${summary.created}건 · 갱신 ${summary.updated}건 적용되었습니다')),
       );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _applying = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('적용 중 오류: $e')),
+        );
+      }
     }
   }
 
@@ -190,9 +202,16 @@ class _PasteImportScreenState extends ConsumerState<PasteImportScreen> {
           if (_result.hasData) ...[
             const SizedBox(height: 16),
             FilledButton.icon(
-              icon: const Icon(Icons.check_circle_outline),
-              label: Text('${_result.assets.length}개 자산 적용'),
-              onPressed: _apply,
+              icon: _applying
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.check_circle_outline),
+              label: Text(_applying
+                  ? '적용 중...'
+                  : '${_result.assets.length}개 자산 적용'),
+              onPressed: _applying ? null : _apply,
             ),
           ],
           const SizedBox(height: 12),
