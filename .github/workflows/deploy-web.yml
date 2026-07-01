@@ -1,5 +1,9 @@
 name: Deploy web (rebalancing subpath)
 
+# Pages 소스가 "Deploy from a branch"인 저장소에서도 동작하도록,
+# 빌드된 웹 결과물을 기본 브랜치(claude/ladder-game-eddac4)의 rebalancing/ 폴더로
+# 커밋한다. Pages 설정 변경이 필요 없다.
+
 on:
   push:
     branches:
@@ -7,19 +11,23 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: pages
+  group: deploy-rebalancing
   cancel-in-progress: true
 
+env:
+  PAGES_BRANCH: claude/ladder-game-eddac4
+
 jobs:
-  build:
+  build-and-publish:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
@@ -33,31 +41,30 @@ jobs:
           flutter pub get
           flutter build web --release --base-href /claude/rebalancing/
 
-      - name: Assemble site (ladder game at root + rebalancing subpath)
+      - name: Publish build to ${{ env.PAGES_BRANCH }} under rebalancing/
         run: |
-          mkdir -p _site/rebalancing
-          # 기존 사다리 게임(정적 파일)은 루트에 유지
-          rsync -a \
-            --exclude 'asset_rebalancing' \
-            --exclude '.git' \
-            --exclude '.github' \
-            --exclude '_site' \
-            ./ _site/
-          # 리밸런싱 앱은 /rebalancing/ 하위에 배치
-          cp -r asset_rebalancing/build/web/. _site/rebalancing/
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: _site
+          # 빌드 산출물을 워크스페이스 밖으로 복사(브랜치 전환 시 보존)
+          rm -rf /tmp/webout && mkdir -p /tmp/webout
+          cp -r asset_rebalancing/build/web/. /tmp/webout/
 
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+          git fetch origin "$PAGES_BRANCH"
+          git worktree add publish "origin/$PAGES_BRANCH"
+
+          rm -rf publish/rebalancing
+          mkdir -p publish/rebalancing
+          cp -r /tmp/webout/. publish/rebalancing/
+
+          cd publish
+          git add rebalancing
+          if git diff --cached --quiet; then
+            echo "변경 없음 - 커밋 생략"
+          else
+            git commit -m "Deploy rebalancing web app to /rebalancing/ [skip ci]"
+            git push origin "HEAD:$PAGES_BRANCH"
+          fi
+
+      - name: Done
+        run: echo "배포 완료 → https://acttop.github.io/claude/rebalancing/"
