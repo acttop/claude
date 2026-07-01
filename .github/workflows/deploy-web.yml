@@ -18,7 +18,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PAGES_BRANCH: claude/ladder-game-eddac4
+  PAGES_BRANCH: gh-pages
 
 jobs:
   build-and-publish:
@@ -57,14 +57,19 @@ jobs:
           mkdir -p publish/rebalancing
           cp -r /tmp/webout/. publish/rebalancing/
 
+          # Jekyll이 flutter 자산(_로 시작 등)을 걸러내지 않도록 비활성화
+          touch publish/.nojekyll
+
           cd publish
-          git add rebalancing
+          git add rebalancing .nojekyll
           if git diff --cached --quiet; then
             echo "변경 없음 - 커밋 생략"
           else
             git commit -m "Deploy rebalancing web app to /rebalancing/ [skip ci]"
             git push origin "HEAD:$PAGES_BRANCH"
           fi
+          echo "gh-pages/rebalancing 내용:"
+          ls -la rebalancing | head -n 20
 
       - name: Done
         run: echo "배포 완료 → https://acttop.github.io/claude/rebalancing/"
