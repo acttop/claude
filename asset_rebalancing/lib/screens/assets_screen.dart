@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/asset.dart';
 import '../providers/portfolio_provider.dart';
 import '../services/format_utils.dart';
-import '../services/parser_service.dart';
 import 'asset_detail_screen.dart';
 import 'asset_edit_screen.dart';
 import 'paste_import_screen.dart';
@@ -14,20 +13,18 @@ class AssetsScreen extends ConsumerWidget {
   const AssetsScreen({super.key});
 
   Future<void> _pasteImport(BuildContext context, WidgetRef ref) async {
-    final clip = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = clip?.text ?? '';
-    if (text.trim().isEmpty) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클립보드가 비어 있습니다. 분석 결과를 먼저 복사하세요.')),
-        );
-      }
-      return;
+    // 웹/iOS Safari에서는 클립보드 자동 읽기가 제한되므로, 값이 있으면 미리 채우고
+    // 없으면 빈 입력창을 열어 사용자가 직접 붙여넣도록 한다.
+    String initial = '';
+    try {
+      final clip = await Clipboard.getData(Clipboard.kTextPlain);
+      initial = clip?.text ?? '';
+    } catch (_) {
+      initial = '';
     }
-    final result = ParserService.parse(text);
     if (context.mounted) {
       Navigator.of(context).push(MaterialPageRoute(
-        builder: (_) => PasteImportScreen(initialText: text, initialResult: result),
+        builder: (_) => PasteImportScreen(initialText: initial),
       ));
     }
   }
