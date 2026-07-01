@@ -16,18 +16,20 @@ class AssetDetailScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final assets = ref.watch(assetProvider).valueOrNull ?? [];
-    Asset? asset;
+    Asset? found;
     for (final a in assets) {
       if (a.id == assetId) {
-        asset = a;
+        found = a;
         break;
       }
     }
     final historyAsync = ref.watch(assetHistoryProvider(assetId));
 
-    if (asset == null) {
+    if (found == null) {
       return const Scaffold(body: Center(child: Text('자산을 찾을 수 없습니다.')));
     }
+    // 클로저 캡처 시 null 승격이 되지 않으므로 비-널 변수로 고정
+    final Asset asset = found;
 
     return Scaffold(
       appBar: AppBar(
