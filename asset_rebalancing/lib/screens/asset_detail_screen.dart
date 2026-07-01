@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../models/asset.dart';
+import '../models/enums.dart';
 import '../models/history.dart';
 import '../providers/portfolio_provider.dart';
 import '../services/format_utils.dart';
@@ -119,14 +120,54 @@ class _Body extends ConsumerWidget {
                 isThreeLine: true,
                 trailing: IconButton(
                   icon: const Icon(Icons.delete_outline, size: 20),
-                  onPressed: () =>
-                      ref.read(historyProvider.notifier).delete(h.id),
+                  onPressed: () => _confirmDeleteHistory(context, ref, h),
                 ),
               ),
             )),
         const SizedBox(height: 24),
       ],
     );
+  }
+
+  Future<void> _confirmDeleteHistory(
+      BuildContext context, WidgetRef ref, History h) async {
+    const valueTypes = {
+      HistoryType.buy,
+      HistoryType.sell,
+      HistoryType.valueUpdate,
+    };
+    final affectsValue = valueTypes.contains(h.type);
+    final effect = h.afterValue - h.beforeValue;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('이력 삭제'),
+        content: Text(affectsValue
+            ? '이 이력을 삭제하면 해당 자산 평가금액이 '
+                '${Fmt.wonSigned(-effect)} 만큼 되돌아갑니다.\n'
+                '(총자산에도 반영됩니다) 계속할까요?'
+            : '이 이력을 삭제할까요?'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('취소')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('삭제')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    await ref.read(assetProvider.notifier).deleteHistoryAndRevert(h);
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+            content: Text(affectsValue
+                ? '이력을 삭제하고 평가금액을 되돌렸습니다.'
+                : '이력을 삭제했습니다.')),
+      );
+    }
   }
 
   Widget _typeBadge(History h) {

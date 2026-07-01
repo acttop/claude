@@ -178,6 +178,36 @@ class AssetNotifier extends AsyncNotifier<List<Asset>> {
     ref.invalidate(historyProvider);
   }
 
+  /// 변동이력 삭제 시, 값에 영향을 준 이력(매수/매도/평가금액갱신)이면
+  /// 그 변동분(afterValue-beforeValue)만큼 자산 평가금액을 되돌린다.
+  Future<void> deleteHistoryAndRevert(History h) async {
+    const valueTypes = {
+      HistoryType.buy,
+      HistoryType.sell,
+      HistoryType.valueUpdate,
+    };
+    if (valueTypes.contains(h.type)) {
+      final assets = await _db.getAssets();
+      Asset? asset;
+      for (final a in assets) {
+        if (a.id == h.assetId) {
+          asset = a;
+          break;
+        }
+      }
+      if (asset != null) {
+        final effect = h.afterValue - h.beforeValue; // 이 이력이 값에 준 변화량
+        var newVal = asset.currentValue - effect;
+        if (newVal < 0) newVal = 0;
+        await _db.upsertAsset(
+            asset.copyWith(currentValue: newVal, updatedAt: DateTime.now()));
+      }
+    }
+    await _db.deleteHistory(h.id);
+    await _reload();
+    ref.invalidate(historyProvider);
+  }
+
   Future<void> refresh() => _reload();
 }
 
