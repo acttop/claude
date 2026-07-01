@@ -1,0 +1,63 @@
+name: Deploy web (rebalancing subpath)
+
+on:
+  push:
+    branches:
+      - claude/asset-rebalancing-app-0h482f
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build Flutter web
+        run: |
+          cd asset_rebalancing
+          flutter create --platforms=web .
+          flutter pub get
+          flutter build web --release --base-href /claude/rebalancing/
+
+      - name: Assemble site (ladder game at root + rebalancing subpath)
+        run: |
+          mkdir -p _site/rebalancing
+          # 기존 사다리 게임(정적 파일)은 루트에 유지
+          rsync -a \
+            --exclude 'asset_rebalancing' \
+            --exclude '.git' \
+            --exclude '.github' \
+            --exclude '_site' \
+            ./ _site/
+          # 리밸런싱 앱은 /rebalancing/ 하위에 배치
+          cp -r asset_rebalancing/build/web/. _site/rebalancing/
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
