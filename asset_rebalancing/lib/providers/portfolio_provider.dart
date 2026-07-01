@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/asset.dart';
@@ -8,12 +9,17 @@ import '../models/snapshot.dart';
 import '../services/database_service.dart';
 import '../services/id_gen.dart';
 import '../services/parser_service.dart';
+import '../services/repository.dart';
+import '../services/web_storage_service.dart';
 
-final dbProvider = Provider<DatabaseService>((ref) => DatabaseService.instance);
+/// 플랫폼에 맞는 저장소 선택: 웹은 localStorage, 네이티브는 SQLite
+final dbProvider = Provider<PortfolioRepository>(
+  (ref) => kIsWeb ? WebStorageService.instance : DatabaseService.instance,
+);
 
 /// 자산 목록 상태 (DB 백킹)
 class AssetNotifier extends AsyncNotifier<List<Asset>> {
-  DatabaseService get _db => ref.read(dbProvider);
+  PortfolioRepository get _db => ref.read(dbProvider);
 
   @override
   Future<List<Asset>> build() => _db.getAssets();
@@ -192,7 +198,7 @@ final totalValueProvider = Provider<double>((ref) {
 
 /// 변동 이력 (assetId 필터 옵션)
 class HistoryNotifier extends AsyncNotifier<List<History>> {
-  DatabaseService get _db => ref.read(dbProvider);
+  PortfolioRepository get _db => ref.read(dbProvider);
 
   @override
   Future<List<History>> build() => _db.getHistories();
@@ -220,7 +226,7 @@ final assetHistoryProvider =
 
 /// 스냅샷
 class SnapshotNotifier extends AsyncNotifier<List<Snapshot>> {
-  DatabaseService get _db => ref.read(dbProvider);
+  PortfolioRepository get _db => ref.read(dbProvider);
 
   @override
   Future<List<Snapshot>> build() => _db.getSnapshots();

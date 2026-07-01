@@ -7,9 +7,10 @@ import 'package:sqflite/sqflite.dart';
 import '../models/asset.dart';
 import '../models/history.dart';
 import '../models/snapshot.dart';
+import 'repository.dart';
 
-/// SQLite 기반 영구 저장소. offline-first, 로컬 전용.
-class DatabaseService {
+/// SQLite 기반 영구 저장소 (네이티브). offline-first, 로컬 전용.
+class DatabaseService implements PortfolioRepository {
   DatabaseService._();
   static final DatabaseService instance = DatabaseService._();
 

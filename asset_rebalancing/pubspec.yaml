@@ -15,12 +15,12 @@ dependencies:
   # 상태관리
   flutter_riverpod: ^2.5.1
 
-  # 로컬 영구 저장소 (SQLite)
+  # 로컬 영구 저장소: 네이티브 SQLite
   sqflite: ^2.3.3
-  # 웹(Flutter Web)에서 SQLite 지원 (IndexedDB + sqlite3.wasm)
-  sqflite_common_ffi_web: ^0.4.3
   path: ^1.9.0
   path_provider: ^2.1.3
+  # 웹 저장소(localStorage) 및 네이티브 설정 저장 백업용
+  shared_preferences: ^2.2.3
 
   # 차트
   fl_chart: ^0.68.0

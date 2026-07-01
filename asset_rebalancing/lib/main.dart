@@ -4,12 +4,9 @@ import 'package:intl/date_symbol_data_local.dart';
 
 import 'providers/settings_provider.dart';
 import 'screens/main_tab_screen.dart';
-import 'services/db_init.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // 웹에서는 sqflite ffi web 팩토리를 설정 (네이티브는 no-op)
-  initPlatformDatabase();
   await initializeDateFormatting('ko_KR', null);
   runApp(const ProviderScope(child: AssetRebalancingApp()));
 }

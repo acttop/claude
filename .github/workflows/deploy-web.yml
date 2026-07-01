@@ -39,8 +39,6 @@ jobs:
           cd asset_rebalancing
           flutter create --platforms=web .
           flutter pub get
-          # 웹용 sqlite3.wasm + sqflite_sw.js 를 web/ 에 생성 (sqflite web 동작에 필요)
-          dart run sqflite_common_ffi_web:setup
           flutter build web --release --base-href /claude/rebalancing/
 
       - name: Publish build to ${{ env.PAGES_BRANCH }} under rebalancing/
