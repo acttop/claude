@@ -1,0 +1,83 @@
+name: Deploy web (rebalancing subpath)
+
+# Pages 소스가 "Deploy from a branch"인 저장소에서도 동작하도록,
+# 빌드된 웹 결과물을 기본 브랜치(claude/ladder-game-eddac4)의 rebalancing/ 폴더로
+# 커밋한다. Pages 설정 변경이 필요 없다.
+
+on:
+  push:
+    branches:
+      - claude/asset-rebalancing-app-0h482f
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: deploy-rebalancing
+  cancel-in-progress: true
+
+env:
+  PAGES_BRANCH: gh-pages
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (full history)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+
+      - name: Build Flutter web
+        run: |
+          cd asset_rebalancing
+          flutter create --platforms=web .
+          flutter pub get
+          # 서비스워커 비활성화(--pwa-strategy=none): 재배포 시 캐시로 인한 빈 화면 방지
+          flutter build web --release --pwa-strategy=none --base-href /claude/rebalancing/
+          # 캐시 무효화: 커밋 SHA를 쿼리로 붙여 브라우저가 항상 최신 번들을 받도록
+          BUST="${GITHUB_SHA:0:8}"
+          cd build/web
+          sed -i "s#flutter_bootstrap.js#flutter_bootstrap.js?v=${BUST}#g" index.html || true
+          sed -i "s#\"main\.dart\.js\"#\"main.dart.js?v=${BUST}\"#g" flutter_bootstrap.js || true
+          echo "--- index.html script tag ---"; grep -o "flutter_bootstrap.js[^\"']*" index.html || true
+          echo "--- bootstrap main ref ---"; grep -o "main.dart.js[^\"']*" flutter_bootstrap.js | head -n1 || true
+
+      - name: Publish build to ${{ env.PAGES_BRANCH }} under rebalancing/
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          # 빌드 산출물을 워크스페이스 밖으로 복사(브랜치 전환 시 보존)
+          rm -rf /tmp/webout && mkdir -p /tmp/webout
+          cp -r asset_rebalancing/build/web/. /tmp/webout/
+
+          git fetch origin "$PAGES_BRANCH"
+          git worktree add publish "origin/$PAGES_BRANCH"
+
+          rm -rf publish/rebalancing
+          mkdir -p publish/rebalancing
+          cp -r /tmp/webout/. publish/rebalancing/
+
+          # Jekyll이 flutter 자산(_로 시작 등)을 걸러내지 않도록 비활성화
+          touch publish/.nojekyll
+
+          cd publish
+          git add rebalancing .nojekyll
+          if git diff --cached --quiet; then
+            echo "변경 없음 - 커밋 생략"
+          else
+            git commit -m "Deploy rebalancing web app to /rebalancing/ [skip ci]"
+            git push origin "HEAD:$PAGES_BRANCH"
+          fi
+          echo "gh-pages/rebalancing 내용:"
+          ls -la rebalancing | head -n 20
+
+      - name: Done
+        run: echo "배포 완료 → https://acttop.github.io/claude/rebalancing/"
