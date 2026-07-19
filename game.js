@@ -33,12 +33,35 @@ function renderList(listId, arr, removeCallback) {
   });
 }
 
+// ── Pure validation helpers (no DOM) ─────────────────────────────────────────
+function validateAddName(rawName, currentCount, max, fullMsg) {
+  const name = rawName.trim();
+  if (!name) return { ok: false };
+  if (currentCount >= max) return { ok: false, error: fullMsg };
+  return { ok: true, name };
+}
+
+function validatePlayerAdd(rawName, currentCount) {
+  return validateAddName(rawName, currentCount, COLS_MAX, `최대 ${COLS_MAX}명까지 추가할 수 있어요`);
+}
+
+function validateResultAdd(rawName, currentCount) {
+  return validateAddName(rawName, currentCount, COLS_MAX, `최대 ${COLS_MAX}개까지 추가할 수 있어요`);
+}
+
+function validateStart(playersCount, resultsCount) {
+  if (playersCount < COLS_MIN) return { ok: false, error: '참가자를 최소 2명 이상 추가해주세요' };
+  if (resultsCount !== playersCount) {
+    return { ok: false, error: `결과 개수(${resultsCount})를 참가자 수(${playersCount})와 같게 맞춰주세요` };
+  }
+  return { ok: true };
+}
+
 function addPlayer() {
   const input = $('player-input');
-  const name = input.value.trim();
-  if (!name) return;
-  if (players.length >= COLS_MAX) { showError('최대 10명까지 추가할 수 있어요'); return; }
-  players.push(name);
+  const check = validatePlayerAdd(input.value, players.length);
+  if (!check.ok) { if (check.error) showError(check.error); return; }
+  players.push(check.name);
   input.value = '';
   renderList('players-list', players, 'removePlayer');
   clearError();
@@ -51,10 +74,9 @@ function removePlayer(i) {
 
 function addResult() {
   const input = $('result-input');
-  const name = input.value.trim();
-  if (!name) return;
-  if (results.length >= COLS_MAX) { showError('최대 10개까지 추가할 수 있어요'); return; }
-  results.push(name);
+  const check = validateResultAdd(input.value, results.length);
+  if (!check.ok) { if (check.error) showError(check.error); return; }
+  results.push(check.name);
   input.value = '';
   renderList('results-list', results, 'removeResult');
   clearError();
@@ -77,15 +99,17 @@ function showError(msg) { $('setup-error').textContent = msg; }
 function clearError() { $('setup-error').textContent = ''; }
 
 // Enter key support
-document.addEventListener('DOMContentLoaded', () => {
-  $('player-input').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
-  $('result-input').addEventListener('keydown', e => { if (e.key === 'Enter') addResult(); });
-});
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => {
+    $('player-input').addEventListener('keydown', e => { if (e.key === 'Enter') addPlayer(); });
+    $('result-input').addEventListener('keydown', e => { if (e.key === 'Enter') addResult(); });
+  });
+}
 
 // ── Game start ─────────────────────────────────────────────────────────────
 function startGame() {
-  if (players.length < COLS_MIN) { showError('참가자를 최소 2명 이상 추가해주세요'); return; }
-  if (results.length !== players.length) { showError(`결과 개수(${results.length})를 참가자 수(${players.length})와 같게 맞춰주세요`); return; }
+  const check = validateStart(players.length, results.length);
+  if (!check.ok) { showError(check.error); return; }
   clearError();
   hide('setup-screen');
   show('game-screen');
@@ -98,37 +122,46 @@ function backToSetup() {
   animating = false;
 }
 
-function buildGame() {
-  const n = players.length;
-  revealed = new Array(n).fill(false);
-  animating = false;
-
-  // Build random ladder
-  ladderMap = Array.from({ length: n }, () => new Array(ROWS).fill(false));
-  for (let row = 0; row < ROWS; row++) {
+// ── Pure ladder algorithm (no DOM) ───────────────────────────────────────────
+function generateLadder(n, rows) {
+  const map = Array.from({ length: n }, () => new Array(rows).fill(false));
+  for (let row = 0; row < rows; row++) {
     let col = 0;
     while (col < n - 1) {
       if (Math.random() < 0.38) {
-        ladderMap[col][row] = true;
+        map[col][row] = true;
         col += 2; // skip next col to avoid adjacent bars
       } else {
         col++;
       }
     }
   }
+  return map;
+}
 
-  // Compute assignments by following each column
-  assignments = players.map((_, startCol) => {
+function computeAssignments(map, n, rows) {
+  const result = [];
+  for (let startCol = 0; startCol < n; startCol++) {
     let col = startCol;
-    for (let row = 0; row < ROWS; row++) {
-      if (ladderMap[col][row]) {
+    for (let row = 0; row < rows; row++) {
+      if (map[col][row]) {
         col++;
-      } else if (col > 0 && ladderMap[col - 1][row]) {
+      } else if (col > 0 && map[col - 1][row]) {
         col--;
       }
     }
-    return col;
-  });
+    result.push(col);
+  }
+  return result;
+}
+
+function buildGame() {
+  const n = players.length;
+  revealed = new Array(n).fill(false);
+  animating = false;
+
+  ladderMap = generateLadder(n, ROWS);
+  assignments = computeAssignments(ladderMap, n, ROWS);
 
   renderPlayerNames();
   renderResultNames();
@@ -242,28 +275,28 @@ function drawLadder(highlight) {
 }
 
 // ── Animation ──────────────────────────────────────────────────────────────
-function buildPath(startCol) {
+function buildPath(map, startCol, rows, rowH) {
   // Returns array of segments for drawing animation
   const segs = [];
   let col = startCol;
-  for (let row = 0; row < ROWS; row++) {
-    const y0 = row * ROW_H + (row === 0 ? 0 : ROW_H / 2);
-    const y1 = row * ROW_H + ROW_H / 2;
+  for (let row = 0; row < rows; row++) {
+    const y0 = row * rowH + (row === 0 ? 0 : rowH / 2);
+    const y1 = row * rowH + rowH / 2;
     segs.push({ col, y0, y1, nextCol: undefined });
 
-    if (ladderMap[col][row]) {
-      const y = row * ROW_H + ROW_H / 2;
+    if (map[col][row]) {
+      const y = row * rowH + rowH / 2;
       segs.push({ col, y0: y, y1: y, nextCol: col + 1 });
       col++;
-    } else if (col > 0 && ladderMap[col - 1][row]) {
-      const y = row * ROW_H + ROW_H / 2;
+    } else if (col > 0 && map[col - 1][row]) {
+      const y = row * rowH + rowH / 2;
       segs.push({ col, y0: y, y1: y, nextCol: col - 1 });
       col--;
     }
   }
   // Final segment to bottom
-  const lastRow = ROWS - 1;
-  segs.push({ col, y0: lastRow * ROW_H + ROW_H / 2, y1: ROWS * ROW_H });
+  const lastRow = rows - 1;
+  segs.push({ col, y0: lastRow * rowH + rowH / 2, y1: rows * rowH });
   return { segs, finalCol: col };
 }
 
@@ -271,7 +304,7 @@ function animatePlayer(playerIdx) {
   if (animating) return;
   if (revealed[playerIdx]) {
     // Already revealed — just highlight
-    const { segs, finalCol } = buildPath(playerIdx);
+    const { segs, finalCol } = buildPath(ladderMap, playerIdx, ROWS, ROW_H);
     drawLadder({ path: segs, color: '#a855f7' });
     highlightBoxes(playerIdx, finalCol);
     return;
@@ -281,7 +314,7 @@ function animatePlayer(playerIdx) {
   const box = $(`player-box-${playerIdx}`);
   box.classList.add('active');
 
-  const { segs, finalCol } = buildPath(playerIdx);
+  const { segs, finalCol } = buildPath(ladderMap, playerIdx, ROWS, ROW_H);
   const color = '#a855f7';
   let stepIdx = 0;
 
@@ -334,4 +367,20 @@ function revealAll() {
     }
   });
   drawLadder(null);
+}
+
+// ── Test exports (no-op in the browser) ──────────────────────────────────────
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = {
+    generateLadder,
+    computeAssignments,
+    buildPath,
+    validatePlayerAdd,
+    validateResultAdd,
+    validateStart,
+    COLS_MIN,
+    COLS_MAX,
+    ROWS,
+    ROW_H,
+  };
 }
