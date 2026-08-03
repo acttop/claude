@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>사다리 게임</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#e94560" />
+
+  <!-- iOS Safari -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="사다리" />
+  <link rel="apple-touch-icon" href="../icons/icon-192.png" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>🪜 사다리 게임</h1>
+    </header>
+
+    <!-- Setup Screen -->
+    <div id="setup-screen" class="screen active">
+      <div class="setup-container">
+        <div class="setup-section">
+          <h2>참가자</h2>
+          <div id="players-list" class="name-list"></div>
+          <div class="add-row">
+            <input type="text" id="player-input" placeholder="이름 입력" maxlength="10" />
+            <button onclick="addPlayer()">추가</button>
+          </div>
+        </div>
+
+        <div class="setup-section">
+          <h2>결과</h2>
+          <div id="results-list" class="name-list"></div>
+          <div class="add-row">
+            <input type="text" id="result-input" placeholder="결과 입력" maxlength="10" />
+            <button onclick="addResult()">추가</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="setup-actions">
+        <button class="btn-primary" onclick="startGame()">게임 시작</button>
+        <button class="btn-secondary" onclick="loadSample()">샘플 불러오기</button>
+      </div>
+      <div id="setup-error" class="error-msg"></div>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="screen">
+      <div class="game-top-bar">
+        <button class="btn-back" onclick="backToSetup()">← 다시 설정</button>
+        <div class="game-actions">
+          <button class="btn-secondary" onclick="revealAll()">전체 결과 보기</button>
+          <button class="btn-primary" onclick="resetGame()">다시 섞기</button>
+        </div>
+      </div>
+
+      <div class="ladder-wrapper">
+        <div id="player-names" class="name-row top-names"></div>
+        <div class="canvas-container">
+          <canvas id="ladder-canvas"></canvas>
+        </div>
+        <div id="result-names" class="name-row bottom-names"></div>
+      </div>
+
+      <div id="result-panel" class="result-panel"></div>
+    </div>
+  </div>
+
+  <script src="game.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
