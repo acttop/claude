@@ -286,42 +286,85 @@
     });
   }
 
-  function renderQuickTemplates() {
-    renderChipFilter('#template-audience-filter', ['전체', ...AUDIENCES], state.composeAudienceFilter, aud => {
-      state.composeAudienceFilter = aud;
-      renderQuickTemplates();
-    });
-    renderChipFilter('#template-category-filter', ['전체', ...CATEGORIES], state.composeCategoryFilter, cat => {
-      state.composeCategoryFilter = cat;
-      renderQuickTemplates();
-    });
+  function applyTemplate(t) {
+    $('#message-body').value = t.body;
+    state.lastUsedTemplateId = t.id;
+    updateCharCounter();
+    $('#message-body').focus();
+  }
 
+  function renderQuickTemplates() {
     const box = $('#quick-templates');
     box.innerHTML = '';
-    let list = sortedTemplates(templates);
-    if (state.composeAudienceFilter !== '전체') {
-      list = list.filter(t => t.audience === state.composeAudienceFilter);
-    }
-    if (state.composeCategoryFilter !== '전체') {
-      list = list.filter(t => t.category === state.composeCategoryFilter);
-    }
+    const list = sortedTemplates(templates).slice(0, 12);
     $('#templates-empty-hint').style.display = templates.length ? 'none' : 'block';
 
     list.forEach(t => {
       const chip = el('div', 'chip' + (t.favorite ? ' star' : ''));
       chip.innerHTML = `${esc(t.title)} <span class="chip-sub">${esc(t.audience)}</span>`;
       chip.title = t.body;
-      chip.addEventListener('click', () => {
-        const body = $('#message-body');
-        body.value = body.value.trim() ? body.value : t.body;
-        if (!body.value.trim()) body.value = t.body;
-        state.lastUsedTemplateId = t.id;
-        updateCharCounter();
-        body.focus();
-      });
+      chip.addEventListener('click', () => applyTemplate(t));
       box.appendChild(chip);
     });
   }
+
+  /* ============================== 문구 선택 모달 (전체 보기) ============================== */
+  function openTemplatePicker() {
+    $('#template-picker-modal').classList.add('show');
+    $('#template-picker-search').value = '';
+    renderTemplatePicker();
+    setTimeout(() => $('#template-picker-search').focus(), 50);
+  }
+
+  function closeTemplatePicker() {
+    $('#template-picker-modal').classList.remove('show');
+  }
+
+  function renderTemplatePicker() {
+    renderChipFilter('#picker-audience-filter', ['전체', ...AUDIENCES], state.composeAudienceFilter, aud => {
+      state.composeAudienceFilter = aud;
+      renderTemplatePicker();
+    });
+    renderChipFilter('#picker-category-filter', ['전체', ...CATEGORIES], state.composeCategoryFilter, cat => {
+      state.composeCategoryFilter = cat;
+      renderTemplatePicker();
+    });
+
+    const box = $('#picker-template-list');
+    box.innerHTML = '';
+    const q = $('#template-picker-search').value.trim().toLowerCase();
+    let list = sortedTemplates(templates);
+    if (state.composeAudienceFilter !== '전체') list = list.filter(t => t.audience === state.composeAudienceFilter);
+    if (state.composeCategoryFilter !== '전체') list = list.filter(t => t.category === state.composeCategoryFilter);
+    if (q) list = list.filter(t => t.title.toLowerCase().includes(q) || t.body.toLowerCase().includes(q));
+
+    list.forEach(t => {
+      const item = el('div', 'entity-item');
+      item.style.cursor = 'pointer';
+      item.innerHTML = `
+        <div class="entity-info">
+          <div class="entity-title">${esc(t.title)}${t.favorite ? ' ⭐' : ''} <span class="entity-tag audience">${esc(t.audience)}</span> <span class="entity-tag">${esc(t.category)}</span></div>
+          <div class="entity-sub">${esc(t.body)}</div>
+        </div>
+      `;
+      item.addEventListener('click', () => {
+        applyTemplate(t);
+        closeTemplatePicker();
+      });
+      box.appendChild(item);
+    });
+
+    if (!list.length) {
+      box.appendChild(el('p', 'empty-hint', '조건에 맞는 문구가 없어요.'));
+    }
+  }
+
+  $('#btn-open-template-picker').addEventListener('click', openTemplatePicker);
+  $('#btn-close-template-picker').addEventListener('click', closeTemplatePicker);
+  $('#template-picker-modal').addEventListener('click', e => {
+    if (e.target.id === 'template-picker-modal') closeTemplatePicker();
+  });
+  $('#template-picker-search').addEventListener('input', renderTemplatePicker);
 
   /* ============================== 글자수 카운터 ============================== */
   function updateCharCounter() {
