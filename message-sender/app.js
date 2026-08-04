@@ -150,6 +150,19 @@
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   }
 
+  /* ============================== 카카오 공유 SDK ============================== */
+  const KAKAO_JS_KEY = '4a5837c19ad95879026b9e39926390d8';
+  const APP_URL = 'https://acttop.github.io/claude/message-sender/';
+  let kakaoReady = false;
+  if (window.Kakao) {
+    try {
+      if (!window.Kakao.isInitialized()) window.Kakao.init(KAKAO_JS_KEY);
+      kakaoReady = window.Kakao.isInitialized();
+    } catch (e) {
+      kakaoReady = false;
+    }
+  }
+
   async function copyText(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -540,6 +553,21 @@
   }
 
   async function doKakao(body) {
+    // 카카오 SDK가 준비돼 있으면 카카오톡 자체 대화상대 선택 화면으로 바로 연결한다.
+    // (범용 공유 시트보다 훨씬 안정적으로 '대화상대 선택'까지 도달한다.)
+    if (kakaoReady && window.Kakao && window.Kakao.Share) {
+      try {
+        window.Kakao.Share.sendDefault({
+          objectType: 'text',
+          text: body,
+          link: { mobileWebUrl: APP_URL, webUrl: APP_URL },
+        });
+        return;
+      } catch (e) {
+        // 카카오 공유 실패 시 아래 Web Share로 대체
+      }
+    }
+
     if (navigator.share) {
       try {
         await navigator.share({ text: body });
