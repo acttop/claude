@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>빠른 메시지 발송</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#e94560" />
+
+  <!-- iOS Safari -->
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="빠른메시지" />
+  <link rel="apple-touch-icon" href="icons/icon-192.png" />
+
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>📨 빠른 메시지 발송</h1>
+      <p class="subtitle">자주 쓰는 문구와 수신자로 문자·카카오톡을 빠르게</p>
+    </header>
+
+    <nav class="tab-bar" id="tab-bar">
+      <button class="tab-btn active" data-screen="compose-screen">✍️ 작성</button>
+      <button class="tab-btn" data-screen="recipients-screen">👤 수신자</button>
+      <button class="tab-btn" data-screen="templates-screen">📋 문구</button>
+      <button class="tab-btn" data-screen="history-screen">🕘 기록</button>
+    </nav>
+
+    <div id="toast" class="toast"></div>
+
+    <!-- ===================== 작성 화면 ===================== -->
+    <section id="compose-screen" class="screen active">
+
+      <div class="card">
+        <div class="card-head">
+          <h2>수신자</h2>
+          <span class="count-badge" id="selected-count">0명 선택</span>
+        </div>
+
+        <div id="selected-recipients" class="chip-row selected-chip-row"></div>
+
+        <div class="search-row">
+          <input type="text" id="recipient-search" placeholder="이름 또는 번호 검색" />
+          <button type="button" class="btn-icon" id="btn-pick-contact" title="연락처에서 가져오기">📇</button>
+        </div>
+
+        <div id="quick-recipients" class="chip-row quick-chip-row"></div>
+        <p class="empty-hint" id="recipients-empty-hint">아직 저장된 수신자가 없어요. '수신자' 탭에서 추가해보세요.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>메시지 문구</h2>
+        </div>
+        <div class="filter-chip-row" id="template-category-filter"></div>
+        <div id="quick-templates" class="chip-row template-chip-row"></div>
+        <p class="empty-hint" id="templates-empty-hint">저장된 문구가 없어요. '문구' 탭에서 추가해보세요.</p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>내용 작성</h2>
+        </div>
+        <textarea id="message-body" rows="6" placeholder="메시지 내용을 입력하세요. {이름} 을 넣으면 수신자 이름으로 자동 치환됩니다."></textarea>
+        <div class="compose-toolbar">
+          <button type="button" class="btn-chip" id="btn-insert-name">+{이름}</button>
+          <button type="button" class="btn-chip" id="btn-clear-body">지우기</button>
+          <div class="spacer"></div>
+          <span id="char-counter" class="char-counter">0자</span>
+        </div>
+      </div>
+
+      <div class="card" id="individual-queue-card" style="display:none;">
+        <div class="card-head">
+          <h2>개별 발송 진행</h2>
+          <span class="count-badge" id="queue-progress">1 / 1</span>
+        </div>
+        <p class="queue-current" id="queue-current-name"></p>
+        <div class="setup-actions">
+          <button type="button" class="btn-secondary" id="btn-queue-skip">건너뛰기</button>
+        </div>
+      </div>
+
+      <div class="card send-card">
+        <label class="switch-row">
+          <input type="checkbox" id="mode-individual" />
+          <span>수신자별로 순서대로 개별 발송 (변수 자동 치환)</span>
+        </label>
+        <div class="setup-actions send-actions">
+          <button type="button" class="btn-primary" id="btn-send-sms">📱 문자로 보내기</button>
+          <button type="button" class="btn-primary btn-kakao" id="btn-send-kakao">💬 카카오톡으로 보내기</button>
+        </div>
+        <div class="setup-actions">
+          <button type="button" class="btn-secondary" id="btn-copy">📋 내용 복사</button>
+        </div>
+        <p class="error-msg" id="compose-error"></p>
+      </div>
+    </section>
+
+    <!-- ===================== 수신자 화면 ===================== -->
+    <section id="recipients-screen" class="screen">
+      <div class="card">
+        <div class="card-head">
+          <h2>수신자 추가</h2>
+        </div>
+        <div class="form-row">
+          <input type="text" id="new-recipient-name" placeholder="이름" maxlength="20" />
+          <input type="tel" id="new-recipient-phone" placeholder="전화번호 (010-1234-5678)" maxlength="20" />
+        </div>
+        <div class="setup-actions">
+          <button type="button" class="btn-primary" id="btn-add-recipient">추가</button>
+          <button type="button" class="btn-secondary" id="btn-pick-contact-2">📇 연락처에서 가져오기</button>
+        </div>
+        <p class="error-msg" id="recipient-form-error"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>저장된 수신자</h2>
+          <span class="count-badge" id="recipient-total-count">0명</span>
+        </div>
+        <input type="text" id="recipient-list-search" class="list-search" placeholder="검색" />
+        <div id="recipient-list" class="entity-list"></div>
+      </div>
+    </section>
+
+    <!-- ===================== 문구 화면 ===================== -->
+    <section id="templates-screen" class="screen">
+      <div class="card">
+        <div class="card-head">
+          <h2>문구 추가</h2>
+        </div>
+        <div class="form-row">
+          <input type="text" id="new-template-title" placeholder="문구 제목 (예: 약속 리마인드)" maxlength="30" />
+          <select id="new-template-category">
+            <option value="일상">일상</option>
+            <option value="업무">업무</option>
+            <option value="약속">약속</option>
+            <option value="감사/축하">감사/축하</option>
+            <option value="기타">기타</option>
+          </select>
+        </div>
+        <textarea id="new-template-body" rows="3" placeholder="메시지 내용 ({이름} 사용 가능)"></textarea>
+        <div class="setup-actions">
+          <button type="button" class="btn-primary" id="btn-add-template">추가</button>
+        </div>
+        <p class="error-msg" id="template-form-error"></p>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <h2>저장된 문구</h2>
+          <span class="count-badge" id="template-total-count">0개</span>
+        </div>
+        <input type="text" id="template-list-search" class="list-search" placeholder="검색" />
+        <div class="filter-chip-row" id="template-manage-category-filter"></div>
+        <div id="template-list" class="entity-list"></div>
+      </div>
+    </section>
+
+    <!-- ===================== 기록 화면 ===================== -->
+    <section id="history-screen" class="screen">
+      <div class="card">
+        <div class="card-head">
+          <h2>보낸 기록</h2>
+          <button type="button" class="btn-secondary btn-small" id="btn-clear-history">전체 삭제</button>
+        </div>
+        <div id="history-list" class="entity-list"></div>
+        <p class="empty-hint" id="history-empty-hint">아직 보낸 기록이 없어요.</p>
+      </div>
+    </section>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
