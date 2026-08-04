@@ -58,12 +58,9 @@
       <div class="card">
         <div class="card-head">
           <h2>메시지 문구</h2>
+          <button type="button" class="btn-secondary btn-small" id="btn-open-template-picker">🔍 전체 보기</button>
         </div>
-        <div class="filter-label">누구에게</div>
-        <div class="filter-chip-row" id="template-audience-filter"></div>
-        <div class="filter-label">어떤 상황</div>
-        <div class="filter-chip-row" id="template-category-filter"></div>
-        <div id="quick-templates" class="chip-row template-chip-row"></div>
+        <div id="quick-templates" class="chip-row template-chip-row-scroll"></div>
         <p class="empty-hint" id="templates-empty-hint">저장된 문구가 없어요. '문구' 탭에서 추가해보세요.</p>
       </div>
 
@@ -302,6 +299,22 @@
         <p class="empty-hint" id="history-empty-hint">아직 보낸 기록이 없어요.</p>
       </div>
     </section>
+
+    <!-- ===================== 문구 선택 모달 ===================== -->
+    <div id="template-picker-modal" class="modal-overlay">
+      <div class="modal-sheet">
+        <div class="modal-head">
+          <h3>문구 선택</h3>
+          <button type="button" class="icon-btn" id="btn-close-template-picker">✕</button>
+        </div>
+        <input type="text" id="template-picker-search" class="list-search" placeholder="문구 검색" />
+        <div class="filter-label">누구에게</div>
+        <div class="filter-chip-row" id="picker-audience-filter"></div>
+        <div class="filter-label">어떤 상황</div>
+        <div class="filter-chip-row" id="picker-category-filter"></div>
+        <div id="picker-template-list" class="entity-list modal-scroll-list"></div>
+      </div>
+    </div>
   </div>
 
   <script src="app.js"></script>

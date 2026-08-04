@@ -553,3 +553,74 @@ textarea { resize: vertical; line-height: 1.5; }
   color: var(--text-muted);
   border: 1px solid var(--border) !important;
 }
+
+/* Quick template strip (horizontal scroll, no page-scroll needed) */
+.template-chip-row-scroll {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 8px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.template-chip-row-scroll .chip {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+/* Template picker modal (bottom sheet) */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 300;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.modal-overlay.show {
+  display: flex;
+}
+
+.modal-sheet {
+  width: 100%;
+  max-width: 640px;
+  max-height: 82vh;
+  background: var(--surface);
+  border-radius: 20px 20px 0 0;
+  padding: 18px;
+  padding-bottom: max(18px, env(safe-area-inset-bottom));
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  animation: sheet-up 0.2s ease;
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.modal-head h3 {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--accent);
+}
+
+.modal-scroll-list {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
