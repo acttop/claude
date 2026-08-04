@@ -1169,19 +1169,19 @@
     return `${y}-${m}-${day}`;
   }
 
-  function currentHHMM(d) {
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
-  }
-
   function checkTimeRules() {
     const now = new Date();
-    const hhmm = currentHHMM(now);
     const dateStr = todayDateStr(now);
     const weekday = now.getDay();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
     let changed = false;
     rules.forEach(rule => {
       if (!rule.enabled || rule.type !== 'time') return;
-      if (rule.timeHHMM !== hhmm) return;
+      const [h, m] = rule.timeHHMM.split(':').map(Number);
+      const targetMinutes = h * 60 + m;
+      // 정확히 그 분에 앱이 켜져 있어야만 발동하면 백그라운드 탭 스로틀링 때문에
+      // 거의 항상 놓친다. 그 날 target 시각을 이미 지났고 아직 안 울렸으면 지금 발동한다.
+      if (nowMinutes < targetMinutes) return;
       if (rule.repeatMode === 'once') {
         if (rule.onceDate !== dateStr || rule.lastFiredKey === 'fired') return;
         rule.lastFiredKey = 'fired';
