@@ -9,6 +9,7 @@
     rules: 'msg_rules_v1',
     seedVersion: 'msg_seed_version_v1',
     pendingFires: 'msg_pending_fires_v1',
+    composeDraft: 'msg_compose_draft_v1',
   };
 
   function load(key, fallback) {
@@ -150,6 +151,29 @@
     return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
   }
 
+  /* ============================== 작성 중 내용 임시 저장 ==============================
+     카카오톡/문자 앱으로 전환했다 돌아오면 iOS Safari가 탭을 새로고침해서 메모리 상태
+     (선택한 수신자, 순차 발송 진행 상황, 입력 중이던 본문)가 날아갈 수 있다. 그래서
+     매번 바뀔 때마다 localStorage에 저장해두고 시작할 때 복원한다. */
+  function saveComposeDraft() {
+    save(STORE.composeDraft, {
+      selectedRecipientIds: Array.from(state.selectedRecipientIds),
+      body: $('#message-body') ? $('#message-body').value : '',
+      queue: state.queue,
+    });
+  }
+
+  function loadComposeDraft() {
+    const draft = load(STORE.composeDraft, null);
+    if (!draft) return;
+    state.selectedRecipientIds = new Set(draft.selectedRecipientIds || []);
+    if (draft.body) $('#message-body').value = draft.body;
+    if (draft.queue) {
+      state.queue = draft.queue;
+      $('#mode-individual').checked = true;
+    }
+  }
+
   /* ============================== 카카오 공유 SDK ============================== */
   const KAKAO_JS_KEY = '4a5837c19ad95879026b9e39926390d8';
   const APP_URL = 'https://acttop.github.io/claude/message-sender/';
@@ -271,6 +295,7 @@
     });
     $('#selected-count').textContent = `${selected.length}명 선택`;
     $('#individual-queue-card').style.display = state.queue ? 'block' : 'none';
+    saveComposeDraft();
 
     const hint = $('#kakao-target-hint');
     if (selected.length) {
@@ -394,7 +419,10 @@
     counter.classList.toggle('warn', bytes > 2000);
   }
 
-  $('#message-body').addEventListener('input', updateCharCounter);
+  $('#message-body').addEventListener('input', () => {
+    updateCharCounter();
+    saveComposeDraft();
+  });
 
   $('#btn-insert-name').addEventListener('click', () => {
     const body = $('#message-body');
@@ -409,6 +437,7 @@
     $('#message-body').value = '';
     state.lastUsedTemplateId = null;
     updateCharCounter();
+    saveComposeDraft();
   });
 
   /* ============================== 연락처 가져오기 ============================== */
@@ -624,6 +653,7 @@
       toast('개별 발송을 종료했어요');
     }
     updateQueueUI();
+    saveComposeDraft();
   });
 
   function getRawBody() {
@@ -641,13 +671,17 @@
 
     const selected = recipients.filter(r => state.selectedRecipientIds.has(r.id));
     const targets = selected.length ? selected : [null];
+    // 이미 진행 중인 순차 발송이 있으면(예: 카카오톡 다녀오면서 탭이 새로고침돼 체크박스가
+    // 풀렸어도) 체크박스 상태와 무관하게 계속 이어간다.
+    const hasActiveQueue = state.queue && state.queue.channel === channel;
     // 문자는 기기/통신사마다 다중 수신자 sms: 링크 처리가 불안정해서 항상 한 명씩 순서대로 보낸다.
-    const individualMode = targets.length > 1 && (channel === 'sms' || $('#mode-individual').checked);
+    const individualMode = hasActiveQueue || (targets.length > 1 && (channel === 'sms' || $('#mode-individual').checked));
 
     if (individualMode) {
       if (!state.queue || state.queue.channel !== channel) {
         state.queue = { targets, index: 0, channel };
       }
+      saveComposeDraft(); // 카카오톡/문자 앱으로 넘어가면서 탭이 새로고침될 수 있으니 미리 저장
       const current = state.queue.targets[state.queue.index];
       const body = fillVars(raw, current?.name);
 
@@ -1430,7 +1464,9 @@
     $('#btn-pick-contact').style.display = 'none';
   }
 
+  loadComposeDraft();
   renderAll();
+  updateQueueUI();
   ensureWatchers();
   checkTimeRules();
   flushPendingFires();
