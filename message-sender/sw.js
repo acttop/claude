@@ -1,4 +1,4 @@
-const CACHE = 'msgsender-v1';
+const CACHE = 'msgsender-v2';
 const ASSETS = [
   './',
   './index.html',
@@ -29,4 +29,24 @@ self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
   );
+});
+
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const action = event.action || 'open';
+  const ruleId = event.notification.data && event.notification.data.ruleId;
+
+  event.waitUntil((async () => {
+    const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+    if (allClients.length) {
+      const client = allClients[0];
+      client.postMessage({ type: 'autosend-action', ruleId, action });
+      await client.focus();
+    } else {
+      const newClient = await self.clients.openWindow('./index.html');
+      if (newClient) {
+        setTimeout(() => newClient.postMessage({ type: 'autosend-action', ruleId, action }), 1500);
+      }
+    }
+  })());
 });

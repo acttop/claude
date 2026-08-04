@@ -421,6 +421,11 @@ textarea { resize: vertical; line-height: 1.5; }
   border-radius: 999px;
 }
 
+.entity-tag.audience {
+  background: #3d2b56;
+  color: #d8b4fe;
+}
+
 .entity-actions {
   display: flex;
   gap: 4px;
@@ -466,4 +471,85 @@ textarea { resize: vertical; line-height: 1.5; }
 .toast.show {
   opacity: 1;
   transform: translateX(-50%) translateY(0);
+}
+
+/* Hints & filter labels */
+.hint-text {
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin-bottom: 10px;
+}
+
+.hint-text b { color: var(--text); }
+
+.filter-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 6px;
+}
+
+.tab-btn { font-size: 0.78rem; }
+
+/* Auto-send banner */
+.autosend-banner {
+  position: fixed;
+  top: max(16px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%) translateY(-140%);
+  width: min(92vw, 460px);
+  background: var(--surface);
+  border: 1px solid var(--purple);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+  z-index: 200;
+  transition: transform 0.25s ease;
+}
+
+.autosend-banner.show {
+  transform: translateX(-50%) translateY(0);
+}
+
+.autosend-banner .ab-title {
+  font-weight: 700;
+  color: var(--purple);
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+
+.autosend-banner .ab-body {
+  font-size: 0.88rem;
+  color: var(--text);
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+}
+
+.autosend-banner .ab-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.autosend-banner .ab-actions button {
+  flex: 1;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.autosend-banner .ab-send {
+  background: var(--purple);
+  color: #fff;
+}
+
+.autosend-banner .ab-skip {
+  background: var(--surface2);
+  color: var(--text-muted);
+  border: 1px solid var(--border) !important;
 }
