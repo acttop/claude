@@ -94,12 +94,13 @@
       <div class="card send-card">
         <label class="switch-row">
           <input type="checkbox" id="mode-individual" />
-          <span>수신자별로 순서대로 개별 발송 (변수 자동 치환)</span>
+          <span>카카오톡도 수신자별로 순서대로 보내기 (변수 자동 치환) — 문자는 2명 이상이면 항상 순서대로 발송돼요</span>
         </label>
         <div class="setup-actions send-actions">
           <button type="button" class="btn-primary" id="btn-send-sms">📱 문자로 보내기</button>
           <button type="button" class="btn-primary btn-kakao" id="btn-send-kakao">💬 카카오톡으로 보내기</button>
         </div>
+        <p class="hint-text" id="kakao-target-hint">카카오톡은 보안정책상 앱이 특정 대화상대를 자동으로 지정할 수 없어요. 공유 창이 뜨면 <b>보낼 대화상대를 직접 선택</b>해주세요.</p>
         <div class="setup-actions">
           <button type="button" class="btn-secondary" id="btn-copy">📋 내용 복사</button>
         </div>

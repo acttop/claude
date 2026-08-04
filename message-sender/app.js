@@ -258,6 +258,14 @@
     });
     $('#selected-count').textContent = `${selected.length}명 선택`;
     $('#individual-queue-card').style.display = state.queue ? 'block' : 'none';
+
+    const hint = $('#kakao-target-hint');
+    if (selected.length) {
+      const names = selected.map(r => r.name).join(', ');
+      hint.innerHTML = `카카오톡은 보안정책상 앱이 특정 대화상대를 자동으로 지정할 수 없어요. 공유 창이 뜨면 <b>${esc(names)}</b>와의 대화방을 직접 선택해주세요.`;
+    } else {
+      hint.innerHTML = '카카오톡은 보안정책상 앱이 특정 대화상대를 자동으로 지정할 수 없어요. 공유 창이 뜨면 <b>보낼 대화상대를 직접 선택</b>해주세요.';
+    }
   }
 
   /* ============================== 문구: 렌더 ============================== */
@@ -494,11 +502,14 @@
         await navigator.share({ text: body });
         return;
       } catch (e) {
-        if (e && e.name === 'AbortError') return;
+        if (e && e.name === 'AbortError') return; // 사용자가 공유 창을 취소함
+        await copyText(body);
+        toast(`공유 창을 열지 못했어요 (${e && e.name ? e.name : '알 수 없는 오류'}). 메시지를 복사했으니 카카오톡에 붙여넣어 주세요.`);
+        return;
       }
     }
     await copyText(body);
-    toast('카카오톡 공유가 지원되지 않아 메시지를 복사했어요. 카카오톡에서 붙여넣어 주세요.');
+    toast('이 브라우저는 공유 기능을 지원하지 않아 메시지를 복사했어요. 카카오톡에서 붙여넣어 주세요.');
   }
 
   function bumpRecipientUsage(r) {
@@ -559,7 +570,8 @@
 
     const selected = recipients.filter(r => state.selectedRecipientIds.has(r.id));
     const targets = selected.length ? selected : [null];
-    const individualMode = $('#mode-individual').checked && targets.length > 1;
+    // 문자는 기기/통신사마다 다중 수신자 sms: 링크 처리가 불안정해서 항상 한 명씩 순서대로 보낸다.
+    const individualMode = targets.length > 1 && (channel === 'sms' || $('#mode-individual').checked);
 
     if (individualMode) {
       if (!state.queue || state.queue.channel !== channel) {
