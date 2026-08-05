@@ -671,11 +671,10 @@
 
     const selected = recipients.filter(r => state.selectedRecipientIds.has(r.id));
     const targets = selected.length ? selected : [null];
-    // 이미 진행 중인 순차 발송이 있으면(예: 카카오톡 다녀오면서 탭이 새로고침돼 체크박스가
-    // 풀렸어도) 체크박스 상태와 무관하게 계속 이어간다.
+    // 이미 진행 중인 순차 발송이 있으면(예: 카카오톡/문자 앱 다녀오면서 탭이 새로고침돼
+    // 체크박스가 풀렸어도) 체크박스 상태와 무관하게 계속 이어간다.
     const hasActiveQueue = state.queue && state.queue.channel === channel;
-    // 문자는 기기/통신사마다 다중 수신자 sms: 링크 처리가 불안정해서 항상 한 명씩 순서대로 보낸다.
-    const individualMode = hasActiveQueue || (targets.length > 1 && (channel === 'sms' || $('#mode-individual').checked));
+    const individualMode = hasActiveQueue || (targets.length > 1 && $('#mode-individual').checked);
 
     if (individualMode) {
       if (!state.queue || state.queue.channel !== channel) {
