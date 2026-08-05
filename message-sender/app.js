@@ -685,10 +685,12 @@
     // 이미 진행 중인 순차 발송이 있으면(예: 카카오톡/문자 앱 다녀오면서 탭이 새로고침돼
     // 체크박스가 풀렸어도) 체크박스 상태와 무관하게 계속 이어간다.
     const hasActiveQueue = state.queue && state.queue.channel === channel;
-    // iOS Messages는 여러 번호 + body를 같이 넘기면 첫 번째 수신자만 남기고 나머지를
-    // 조용히 지워버린다(실기기 확인됨). "그룹으로 보냈다고 생각했는데 한 명한테만 감"이라는
-    // 잘못된 발송으로 이어질 수 있어서, 문자는 항상 한 명씩 순서대로 보낸다.
-    const individualMode = hasActiveQueue || (targets.length > 1 && (channel === 'sms' || $('#mode-individual').checked));
+    // iOS Messages는 여러 번호 + body를 같이 넘기면 일부 기기에서 첫 번째 수신자만
+    // 남기고 나머지를 조용히 지워버릴 수 있다(실기기 확인됨). 그래서 문자는 기본이
+    // 한 명씩 순서대로이고, 위험을 감수하겠다고 명시적으로 체크한 경우에만 그룹으로 시도한다.
+    const smsGroupRisky = $('#mode-sms-group-risky').checked;
+    const wantsIndividual = channel === 'sms' ? !smsGroupRisky : $('#mode-individual').checked;
+    const individualMode = hasActiveQueue || (targets.length > 1 && wantsIndividual);
 
     if (individualMode) {
       if (!state.queue || state.queue.channel !== channel) {
