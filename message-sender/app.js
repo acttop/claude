@@ -636,11 +636,14 @@
     renderQuickRecipients();
   }
 
+  const QUEUE_CHANNEL_LABEL = { sms: '📱 문자 개별 발송 진행', kakao: '💬 카카오톡 개별 발송 진행' };
+
   function updateQueueUI() {
     const card = $('#individual-queue-card');
     if (!state.queue) { card.style.display = 'none'; return; }
     card.style.display = 'block';
-    const { targets, index } = state.queue;
+    const { targets, index, channel } = state.queue;
+    $('#queue-channel-label').textContent = QUEUE_CHANNEL_LABEL[channel] || '개별 발송 진행';
     $('#queue-progress').textContent = `${index + 1} / ${targets.length}`;
     $('#queue-current-name').textContent = `다음: ${targets[index]?.name || '(수신자 없음)'}`;
   }
@@ -654,6 +657,14 @@
     }
     updateQueueUI();
     saveComposeDraft();
+  });
+
+  $('#btn-queue-cancel').addEventListener('click', () => {
+    if (!state.queue) return;
+    state.queue = null;
+    updateQueueUI();
+    saveComposeDraft();
+    toast('개별 발송을 취소했어요');
   });
 
   function getRawBody() {
