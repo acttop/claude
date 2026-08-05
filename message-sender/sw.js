@@ -1,4 +1,4 @@
-const CACHE = 'msgsender-v2';
+const CACHE = 'msgsender-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -26,8 +26,16 @@ self.addEventListener('activate', e => {
 
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
+  // 온라인이면 항상 최신 파일을 먼저 받아온다(캐시는 오프라인 대비 백업 용도).
+  // 순수 캐시 우선 전략은 배포한 새 버전이 반영 안 되는 문제가 있었다.
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    fetch(e.request)
+      .then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put(e.request, copy));
+        return res;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
 
