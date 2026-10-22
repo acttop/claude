@@ -31,12 +31,9 @@ jobs:
           --collect-all pdfplumber --collect-all pypdfium2 --collect-all tesserocr
           --add-data "tessdata;tessdata" run_gui.py
       - name: Smoke test (text PDF + scanned PDF via exe)
-        shell: pwsh
         run: |
           python tests/make_scan.py
-          Start-Process dist\PDF2Excel.exe -ArgumentList "samples\sample.pdf","-o","smoke.xlsx" -Wait
-          Start-Process dist\PDF2Excel.exe -ArgumentList "scan_sample.pdf","-o","smoke_scan.xlsx" -Wait
-          python -c "from openpyxl import load_workbook as L; a=L('smoke.xlsx'); b=L('smoke_scan.xlsx'); print(a.sheetnames, b.sheetnames); r=list(b['P1_표1'].iter_rows(values_only=True)); print(r[:3]); assert r[1][0]=='N-01', r"
+          python tests/smoke_exe.py
       - uses: actions/upload-artifact@v4
         with:
           name: PDF2Excel-windows
