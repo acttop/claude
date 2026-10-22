@@ -12,6 +12,8 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 from openpyxl.utils import get_column_letter
 
+from .analyze import METHOD_FALLBACK, METHOD_OCR, METHOD_OCR_FAILED, OCR_AUTO, OCR_OFF, analyze_page
+
 log = logging.getLogger(__name__)
 
 # 엑셀 셀에 허용되지 않는 제어문자 (openpyxl IllegalCharacterError 방지)
@@ -33,6 +35,7 @@ class ConvertOptions:
     pages: list[int] | None = None  # 1부터 시작, None이면 전체
     convert_numbers: bool = True    # "1,234" -> 1234 숫자 변환
     password: str | None = None
+    ocr: str = OCR_AUTO             # off / auto(텍스트 없는 페이지만) / force
 
 
 @dataclass
@@ -41,6 +44,9 @@ class ConvertResult:
     pages: int = 0
     tables: int = 0
     text_pages: int = 0
+    ocr_pages: int = 0
+    failed_pages: list[int] = field(default_factory=list)  # method=ocr_failed 페이지
+    methods: dict[int, str] = field(default_factory=dict)  # 페이지 → 추출 방법
     warnings: list[str] = field(default_factory=list)
 
 
@@ -136,6 +142,20 @@ def _safe_sheet_title(title: str, used: set[str]) -> str:
     return title
 
 
+def _needs_ocr(page, ocr: str) -> bool:
+    from .analyze import OCR_FORCE, has_text_layer
+    return ocr == OCR_FORCE or (ocr != OCR_OFF and not has_text_layer(page))
+
+
+def _open_engine():
+    """OCR 엔진을 연다. 실패하면 (None, 사유)를 돌려 페이지 결과에 사유가 남게 한다."""
+    try:
+        from .extract_ocr import OcrEngine
+        return OcrEngine(), None
+    except Exception as e:  # noqa: BLE001
+        return None, str(e)
+
+
 def convert(pdf_path: str | Path, xlsx_path: str | Path | None = None,
             options: ConvertOptions | None = None,
             progress: Callable[[int, int], None] | None = None) -> ConvertResult:
@@ -159,26 +179,40 @@ def convert(pdf_path: str | Path, xlsx_path: str | Path | None = None,
             result.warnings.append(f"존재하지 않는 페이지 무시: {invalid} (전체 {total}쪽)")
         targets = [p for p in targets if p <= total]
 
+        engine, engine_error = None, None
         for idx, page_no in enumerate(targets, start=1):
             page = pdf.pages[page_no - 1]
-            tables = []
-            if opts.mode in (MODE_TABLE, MODE_AUTO):
-                tables = [t for t in page.extract_tables() if t and any(any(c for c in r) for r in t)]
+            if engine is None and engine_error is None and _needs_ocr(page, opts.ocr):
+                engine, engine_error = _open_engine()
 
+            pr = analyze_page(page, page_no, pdf_path=pdf_path, password=opts.password,
+                              ocr=opts.ocr, engine=engine, engine_error=engine_error)
+            result.methods[page_no] = pr.method
+            if pr.method in (METHOD_OCR, METHOD_FALLBACK, METHOD_OCR_FAILED):
+                result.ocr_pages += 1
+            if pr.method == METHOD_FALLBACK:
+                result.warnings.append(f"{page_no}쪽: {pr.error} → PDF 텍스트로 대체 추출")
+            if pr.method == METHOD_OCR and pr.rotation:
+                result.warnings.append(f"{page_no}쪽: {pr.rotation}도 회전된 스캔으로 판단해 보정")
+
+            tables = pr.tables if opts.mode in (MODE_TABLE, MODE_AUTO) else []
             blocks: list[tuple[str, list[list], bool]] = []  # (이름, 행들, 헤더여부)
-            if tables:
+            if pr.method == METHOD_OCR_FAILED:
+                # 조용한 실패 금지: 실패 사유를 결과와 시트에 남긴다
+                result.failed_pages.append(page_no)
+                result.warnings.append(f"{page_no}쪽: [ocr_failed] {pr.error}")
+                rows = [[f"[OCR 실패] {pr.error}"]] + [[ln] for ln in pr.lines]
+                blocks.append((f"P{page_no}_OCR실패", rows, False))
+            elif tables:
                 for t_i, table in enumerate(tables, start=1):
                     blocks.append((f"P{page_no}_표{t_i}", table, True))
                 result.tables += len(tables)
             elif opts.mode in (MODE_TEXT, MODE_AUTO):
-                text = page.extract_text() or ""
-                lines = [[line] for line in text.splitlines() if line.strip()]
-                if lines:
-                    blocks.append((f"P{page_no}_텍스트", lines, False))
+                if pr.lines:
+                    blocks.append((f"P{page_no}_텍스트", [[ln] for ln in pr.lines], False))
                     result.text_pages += 1
                 else:
-                    result.warnings.append(
-                        f"{page_no}쪽: 추출할 텍스트가 없습니다 (스캔 이미지 PDF일 수 있음)")
+                    result.warnings.append(f"{page_no}쪽: 추출할 텍스트가 없습니다")
 
             for name, rows, header in blocks:
                 if opts.layout == LAYOUT_SINGLE:
@@ -197,10 +231,12 @@ def convert(pdf_path: str | Path, xlsx_path: str | Path | None = None,
             result.pages += 1
             if progress:
                 progress(idx, len(targets))
+        if engine is not None:
+            engine.close()
 
     if not wb.sheetnames:
         ws = wb.create_sheet("결과없음")
-        ws["A1"] = "추출된 데이터가 없습니다. 스캔(이미지) PDF는 OCR이 필요합니다."
+        ws["A1"] = "추출된 데이터가 없습니다."
         result.warnings.append("추출된 데이터가 없습니다.")
     for ws in wb.worksheets:
         _autofit(ws)

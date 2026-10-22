@@ -39,21 +39,25 @@ def main() -> int:
         try:
             r = convert(pdf, target)
             status = "주의" if r.warnings else "성공"
-            row = [pdf.name, status, r.pages, r.tables, r.text_pages,
+            methods = ", ".join(f"{p}쪽:{m}" for p, m in r.methods.items())
+            row = [pdf.name, status, r.pages, r.tables, r.text_pages, r.ocr_pages,
+                   ",".join(map(str, r.failed_pages)), methods,
                    "; ".join(r.warnings), str(r.output)]
         except Exception as e:  # noqa: BLE001
             status = "실패"
-            row = [pdf.name, status, None, None, None, f"{type(e).__name__}: {e}", ""]
+            row = [pdf.name, status, None, None, None, None, "", "",
+                   f"{type(e).__name__}: {e}", ""]
             (out / "errors.log").open("a", encoding="utf-8").write(
                 f"== {pdf}\n{traceback.format_exc()}\n")
-        row.insert(6, round(time.perf_counter() - t0, 2))
+        row.insert(9, round(time.perf_counter() - t0, 2))
         rows.append(row)
-        print(f"[{status}] {pdf.name}  페이지 {row[2]}, 표 {row[3]}, {row[6]}초")
+        print(f"[{status}] {pdf.name}  페이지 {row[2]}, 표 {row[3]}, OCR {row[5]}, {row[9]}초")
 
     wb = Workbook()
     ws = wb.active
     ws.title = "테스트결과"
-    ws.append(["파일명", "결과", "페이지", "표 개수", "텍스트 페이지", "경고/오류", "소요(초)", "출력 파일"])
+    ws.append(["파일명", "결과", "페이지", "표 개수", "텍스트 페이지", "OCR 페이지",
+               "OCR 실패 페이지", "페이지별 방법", "경고/오류", "소요(초)", "출력 파일"])
     for c in ws[1]:
         c.font = Font(bold=True)
         c.fill = PatternFill("solid", fgColor="DDEBF7")

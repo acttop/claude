@@ -8,6 +8,7 @@ from pathlib import Path
 from tkinter import filedialog, messagebox, ttk
 
 from . import __version__
+from .analyze import OCR_AUTO, OCR_FORCE, OCR_OFF
 from .core import (LAYOUT_PER_PAGE, LAYOUT_SINGLE, MODE_AUTO, MODE_TABLE,
                    MODE_TEXT, ConvertOptions, convert, parse_pages)
 
@@ -16,7 +17,7 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title(f"PDF → Excel 변환기 v{__version__}")
-        self.geometry("720x520")
+        self.geometry("720x560")
         self.minsize(640, 460)
         self.events: queue.Queue = queue.Queue()
         self.files: list[Path] = []
@@ -44,6 +45,7 @@ class App(tk.Tk):
         self.pages = tk.StringVar()
         self.password = tk.StringVar()
         self.numbers = tk.BooleanVar(value=True)
+        self.ocr = tk.StringVar(value=OCR_AUTO)
 
         ttk.Label(f_opt, text="추출 방식").grid(row=0, column=0, sticky="w", **pad)
         for i, (txt, val) in enumerate([("자동(표 우선)", MODE_AUTO), ("표만", MODE_TABLE),
@@ -64,6 +66,12 @@ class App(tk.Tk):
             row=3, column=1, sticky="w")
         ttk.Checkbutton(f_opt, text="숫자 문자열을 숫자로 변환 (1,234 → 1234)",
                         variable=self.numbers).grid(row=3, column=2, columnspan=2, sticky="w")
+
+        ttk.Label(f_opt, text="OCR(스캔 PDF)").grid(row=4, column=0, sticky="w", **pad)
+        for i, (txt, val) in enumerate([("자동(스캔 페이지만)", OCR_AUTO), ("사용 안 함", OCR_OFF),
+                                        ("모든 페이지", OCR_FORCE)]):
+            ttk.Radiobutton(f_opt, text=txt, value=val, variable=self.ocr).grid(
+                row=4, column=i + 1, sticky="w")
 
         f_out = ttk.LabelFrame(self, text="3. 저장 위치")
         f_out.pack(fill="x", **pad)
@@ -116,7 +124,7 @@ class App(tk.Tk):
             return
         opts = ConvertOptions(mode=self.mode.get(), layout=self.layout.get(), pages=pages,
                               convert_numbers=self.numbers.get(),
-                              password=self.password.get() or None)
+                              password=self.password.get() or None, ocr=self.ocr.get())
         self.run_btn.config(state="disabled")
         threading.Thread(target=self._worker, args=(list(self.files), opts,
                                                      self.out_dir.get().strip()),

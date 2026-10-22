@@ -19,7 +19,13 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
-pyinstaller --noconfirm --onefile --windowed --name PDF2Excel --collect-all pdfplumber --collect-all pypdfium2 run_gui.py
+python scripts\fetch_tessdata.py
+if errorlevel 1 (
+  echo [ERROR] OCR data download failed. Put kor.traineddata and eng.traineddata in tessdata folder.
+  pause
+  exit /b 1
+)
+pyinstaller --noconfirm --onefile --windowed --name PDF2Excel --collect-all pdfplumber --collect-all pypdfium2 --collect-all tesserocr --add-data "tessdata;tessdata" run_gui.py
 if errorlevel 1 (
   echo [ERROR] Build failed.
   pause

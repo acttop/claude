@@ -9,3 +9,6 @@ input/
 results/
 *.zip
 samples/*.xlsx
+tessdata/
+tests/fonts/
+samples/scan_sample.pdf
