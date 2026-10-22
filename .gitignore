@@ -1,0 +1,11 @@
+__pycache__/
+.pytest_cache/
+.venv/
+wheelhouse/
+build/
+dist/
+*.spec
+input/
+results/
+*.zip
+samples/*.xlsx
