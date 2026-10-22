@@ -19,17 +19,31 @@ def fail(msg: str):
     sys.exit(1)
 
 
-env = dict(os.environ, PDF2EXCEL_LOG=str(LOG))
-for src, out, sheet, first in CASES:
-    Path(out).unlink(missing_ok=True)
-    p = subprocess.run([str(EXE), src, "-o", out], env=env, timeout=600)
-    if not Path(out).exists():
-        fail(f"{src}: 결과 파일 없음 (exit {p.returncode})")
-    wb = load_workbook(out)
-    if sheet not in wb.sheetnames:
-        fail(f"{src}: 시트 {sheet} 없음, 실제 {wb.sheetnames}")
-    rows = list(wb[sheet].iter_rows(values_only=True))
-    if rows[0][0] != first and first not in rows[0]:
-        fail(f"{src}: 헤더 불일치 {rows[:2]}")
-    print(f"[OK] {src} -> {wb.sheetnames} {rows[:2]}")
-print(LOG.read_text(encoding="utf-8") if LOG.exists() else "")
+def main():
+    env = dict(os.environ, PDF2EXCEL_LOG=str(LOG))
+    for src, out, sheet, first in CASES:
+        if not Path(src).exists():
+            fail(f"입력 파일 없음: {src}")
+        Path(out).unlink(missing_ok=True)
+        p = subprocess.run([str(EXE), src, "-o", out], env=env, timeout=600)
+        if not Path(out).exists():
+            fail(f"{src}: 결과 파일 없음 (exit {p.returncode})")
+        wb = load_workbook(out)
+        if sheet not in wb.sheetnames:
+            fail(f"{src}: 시트 {sheet} 없음, 실제 {wb.sheetnames}")
+        rows = list(wb[sheet].iter_rows(values_only=True))
+        if first not in rows[0]:
+            fail(f"{src}: 헤더 불일치 {rows[:2]}")
+        print(f"[OK] {src} -> {wb.sheetnames} {rows[:2]}")
+    print(LOG.read_text(encoding="utf-8") if LOG.exists() else "")
+
+
+if __name__ == "__main__":
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    try:
+        main()
+    except SystemExit:
+        raise
+    except BaseException as e:  # noqa: BLE001 - 어떤 오류든 화면에 남긴다
+        fail(f"smoke 스크립트 오류: {type(e).__name__}: {e}")
