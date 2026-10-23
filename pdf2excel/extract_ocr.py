@@ -49,6 +49,7 @@ class OcrPage:
     rotation: int            # 채택한 회전 각도 (0 또는 180)
     confidence: float        # 방향 판별 시 평균 신뢰도
     text: str                # 페이지 전체 OCR 텍스트 (표 미검출 시 참고용)
+    cell_errors: list[str] = None  # 인식 중 오류가 난 셀 (예: "3행 2열: RuntimeError ...")
 
 
 def find_tessdata() -> Path:
@@ -135,7 +136,7 @@ class OcrEngine:
         out, it = [], api.GetIterator()
         level = self._t.RIL.WORD
         while it is not None:
-            t = it.GetUTF8Text(level)
+            t = _iter_text(it, level)
             if t:
                 x0, _, x1, _ = it.BoundingBox(level)
                 out.append(Word(t, x0, x1, float(it.Confidence(level))))
@@ -153,13 +154,22 @@ class OcrEngine:
         out, it = [], api.GetIterator()
         level = self._t.RIL.SYMBOL
         while it is not None:
-            t = it.GetUTF8Text(level)
+            t = _iter_text(it, level)
             if t:
                 x0, _, x1, _ = it.BoundingBox(level)
                 out.append(Word(t, x0, x1, float(it.Confidence(level))))
             if not it.Next(level):
                 break
         return out
+
+
+def _iter_text(it, level) -> str:
+    """tesserocr 반복자는 인식 결과가 빈 위치에서 RuntimeError("No text returned")를 낸다.
+    빈 조각(셀 여백, 괘선 잔여물)은 흔하므로 빈 문자열로 처리한다."""
+    try:
+        return it.GetUTF8Text(level) or ""
+    except RuntimeError:
+        return ""
 
 
 @dataclass
@@ -574,15 +584,26 @@ def column_kind(header: str | None) -> str:
     return ""
 
 
-def read_table(engine: OcrEngine, gray: np.ndarray, ys: list[int], xs: list[int]) -> list[list]:
-    """첫 행(헤더)을 먼저 읽어 열 종류를 정한 뒤 나머지 셀을 읽는다."""
+def read_table(engine: OcrEngine, gray: np.ndarray, ys: list[int], xs: list[int],
+               errors: list[str] | None = None) -> list[list]:
+    """첫 행(헤더)을 먼저 읽어 열 종류를 정한 뒤 나머지 셀을 읽는다.
+    셀 하나에서 오류가 나도 그 셀만 비우고 계속하며, 오류는 errors 에 남긴다."""
     ncol = len(xs) - 1
-    cell = lambda r, c: _cell_image(gray, xs[c], ys[r], xs[c + 1], ys[r + 1])  # noqa: E731
-    header = [read_cell(engine, cell(0, c)) for c in range(ncol)]
+
+    def safe(r: int, c: int, kind: str = "") -> str | None:
+        try:
+            return read_cell(engine, _cell_image(gray, xs[c], ys[r], xs[c + 1], ys[r + 1]), kind)
+        except Exception as e:  # noqa: BLE001 - 셀 단위로 격리
+            log.warning("%d행 %d열 인식 오류: %s", r + 1, c + 1, e)
+            if errors is not None:
+                errors.append(f"{r + 1}행 {c + 1}열: {type(e).__name__} {e}")
+            return None
+
+    header = [safe(0, c) for c in range(ncol)]
     kinds = [column_kind(h) for h in header]
     rows = [header] if any(header) else []
     for r in range(1, len(ys) - 1):
-        row = [read_cell(engine, cell(r, c), kinds[c]) for c in range(ncol)]
+        row = [safe(r, c, kinds[c]) for c in range(ncol)]
         if any(v for v in row):
             rows.append(row)
     return rows
@@ -626,10 +647,11 @@ def ocr_page(engine: OcrEngine, gray: np.ndarray) -> OcrPage:
     """페이지 이미지 1장을 OCR. 표 영역(괘선 안쪽)만 표로 만든다."""
     img, angle, conf = choose_orientation(engine, gray)
     img = remove_background(img)
-    tables = []
+    tables, errors = [], []
     for bbox, ys, xs in detect_tables(img):
-        rows = read_table(engine, img, ys, xs)
+        rows = read_table(engine, img, ys, xs, errors)
         if rows:
             tables.append(OcrTable(rows=rows, bbox=bbox))
     text = "" if tables else engine.read(img, psm=3)[0]
-    return OcrPage(tables=tables, rotation=angle, confidence=conf, text=text)
+    return OcrPage(tables=tables, rotation=angle, confidence=conf, text=text,
+                   cell_errors=errors)

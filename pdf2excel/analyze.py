@@ -59,7 +59,11 @@ def analyze_page(page, page_no: int, *, pdf_path=None, password=None,
         from .extract_ocr import ocr_page, render_page
         result = ocr_page(engine, render_page(pdf_path, page_no - 1, password))
         if result.tables:
-            return PageResult(page_no, METHOD_OCR, rotation=result.rotation,
+            err = None
+            if result.cell_errors:  # 일부 셀만 실패: 표는 살리고 실패 셀을 알린다
+                err = (f"셀 {len(result.cell_errors)}개 인식 오류(빈칸 처리): "
+                       + "; ".join(result.cell_errors[:5]))
+            return PageResult(page_no, METHOD_OCR, rotation=result.rotation, error=err,
                               tables=[normalize_table(t.rows) for t in result.tables])
         ocr_text = result.text
         ocr_error = "OCR 결과에서 표(괘선)를 찾지 못했습니다."

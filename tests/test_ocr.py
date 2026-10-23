@@ -192,3 +192,37 @@ def test_code_column_fixes():
     assert got == ["N-01", "N-02", "N-03", "N-04", "N-05"]
     # 연속 번호 근거가 없으면 추측하지 않는다
     assert fix_code_column(["N-01", "0", "N-07"])[1] == "0"
+
+
+# ---------- 2026-10-23 제보: "OCR 실패: No text returned" ----------
+@needs_ocr
+def test_blank_strip_does_not_raise():
+    """빈 조각을 읽으면 tesserocr 반복자가 RuntimeError("No text returned")를 낸다."""
+    import numpy as np
+    from pdf2excel.extract_ocr import read_line
+    with OcrEngine() as eng:
+        for shape in ((30, 200), (60, 400), (12, 12)):
+            blank = np.full(shape, 255, np.uint8)
+            eng.symbols(blank, "kor")  # 예외 없이 끝나야 함
+            eng.words(blank)
+            read_line(eng, blank)
+
+
+@needs_ocr
+def test_cell_error_is_isolated(tmp_path, monkeypatch):
+    """셀 하나에서 오류가 나도 페이지 전체가 ocr_failed 가 되지 않고, 경고로 남아야 한다."""
+    from pdf2excel import extract_ocr
+    real = extract_ocr.read_cell
+    calls = {"n": 0}
+
+    def flaky(engine, cell, kind=""):
+        calls["n"] += 1
+        if calls["n"] == 8:
+            raise RuntimeError("No text returned")
+        return real(engine, cell, kind)
+
+    monkeypatch.setattr(extract_ocr, "read_cell", flaky)
+    pdf = make_scan_pdf(tmp_path / "s.pdf", [(sample_rows(1, 3), False)])
+    res = convert(pdf, tmp_path / "s.xlsx")
+    assert res.methods[1] == METHOD_OCR and res.tables == 1
+    assert any("인식 오류" in w and "No text returned" in w for w in res.warnings)

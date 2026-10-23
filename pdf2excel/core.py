@@ -192,6 +192,8 @@ def convert(pdf_path: str | Path, xlsx_path: str | Path | None = None,
                 result.ocr_pages += 1
             if pr.method == METHOD_FALLBACK:
                 result.warnings.append(f"{page_no}쪽: {pr.error} → PDF 텍스트로 대체 추출")
+            if pr.method == METHOD_OCR and pr.error:
+                result.warnings.append(f"{page_no}쪽: {pr.error}")
             if pr.method == METHOD_OCR and pr.rotation:
                 result.warnings.append(f"{page_no}쪽: {pr.rotation}도 회전된 스캔으로 판단해 보정")
 
