@@ -28,7 +28,13 @@ jobs:
           New-Item -ItemType Directory -Force tests/fonts | Out-Null
           Invoke-WebRequest https://raw.githubusercontent.com/google/fonts/main/ofl/nanumgothic/NanumGothic-Regular.ttf -OutFile tests/fonts/NanumGothic-Regular.ttf
       - name: Test
-        run: python -m pytest tests -q
+        run: python -m pytest tests -q --junitxml=junit.xml
+      - name: Report test failures
+        if: failure()
+        run: >
+          python -c "import xml.etree.ElementTree as E;
+          [print('::error::' + (c.get('name') or '') + ' | ' + ((f.get('message') or '') + ' ' + (f.text or '')).replace(chr(10), ' / ')[:3000])
+          for c in E.parse('junit.xml').iter('testcase') for f in list(c) if f.tag in ('failure', 'error')]"
       - name: Build
         run: >
           pyinstaller --noconfirm --onefile --windowed --name PDF2Excel
