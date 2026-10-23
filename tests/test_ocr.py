@@ -139,3 +139,39 @@ def test_speck_only_cell_is_empty():
     cell[rng.integers(0, 110, 15), rng.integers(0, 200, 15)] = 0  # 스캔 잡티
     with OcrEngine() as eng:
         assert read_cell(eng, cell, kind="qty") is None
+
+
+# ---------- 2026-10-23 PM님 제보 사례 (워터마크 + 여러 줄 셀 + 한영 혼용) ----------
+@needs_ocr
+def test_maintenance_list_case(tmp_path):
+    """제보 화면의 오류가 재발하지 않는지 확인한다.
+
+    수정 전: "mH" 헤더, 구분 "0", 품번 "시-02"/"N-0S", 여러 줄 셀의 첫 줄 누락,
+             "Gen9"→"6609", 워터마크 획 때문에 열이 늘어나고 행이 갈라짐
+    """
+    from difflib import SequenceMatcher
+    from make_maint import HEADER, ROWS, make_maint_pdf
+
+    res = convert(make_maint_pdf(tmp_path / "m.pdf"), tmp_path / "m.xlsx")
+    got = [list(r) for r in load_workbook(res.output)["P1_표1"].iter_rows(values_only=True)]
+    assert got[0] == HEADER
+    assert len(got) == len(ROWS) + 1 and all(len(r) == 4 for r in got)  # 행/열 수 그대로
+    for g, e in zip(got[1:], ROWS):
+        assert g[0] == e[0] and g[1] == e[1] and g[3] == int(e[3])  # 품번·구분·수량 정확
+        assert g[2].count("\n") == e[2].count("\n")                   # 여러 줄 유지
+    must = ["EMC VNX 5200", "HP DL380 Gen9 8SFF CTO Server", "코어브릿지",
+            "REDHAT LINUX E.E", "6식 라이선스 갱신 포함", "AXGATE 2300", "G-bic"]
+    names = "\n".join(r[2] for r in got[1:])
+    for m in must:
+        assert m in names
+    truth = "\n".join(r[2] for r in ROWS)
+    assert SequenceMatcher(None, names, truth).ratio() >= 0.95
+
+
+def test_code_column_fixes():
+    """제보 화면의 품번 오인식: "시-02"(접두어), "N-0S"(S↔5), "0"(N-04 자리)."""
+    from pdf2excel.normalize import fix_code_column
+    got = fix_code_column(["N-01", "시-02", "N-03", "0", "N-0S"])
+    assert got == ["N-01", "N-02", "N-03", "N-04", "N-05"]
+    # 연속 번호 근거가 없으면 추측하지 않는다
+    assert fix_code_column(["N-01", "0", "N-07"])[1] == "0"

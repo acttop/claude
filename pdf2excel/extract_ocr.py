@@ -93,10 +93,21 @@ class OcrEngine:
         except ImportError as e:
             raise OcrError("OCR 엔진(tesserocr)이 설치되어 있지 않습니다.") from e
         self._t = tesserocr
-        self.api = tesserocr.PyTessBaseAPI(path=str(tessdata or find_tessdata()), lang=lang)
+        self._path = str(tessdata or find_tessdata())
+        self.api = tesserocr.PyTessBaseAPI(path=self._path, lang=lang)
+        self._extra = {}  # 줄 재인식용 보조 엔진 {"eng": 영문 전용, "kor": 한글 전용}
+
+    def _api(self, lang: str | None):
+        if not lang:
+            return self.api
+        if lang not in self._extra:
+            self._extra[lang] = self._t.PyTessBaseAPI(path=self._path, lang=lang)
+        return self._extra[lang]
 
     def close(self):
         self.api.End()
+        for api in self._extra.values():
+            api.End()
 
     def __enter__(self):
         return self
@@ -104,12 +115,41 @@ class OcrEngine:
     def __exit__(self, *exc):
         self.close()
 
-    def read(self, img: np.ndarray, psm: int, whitelist: str = "") -> tuple[str, float]:
-        self.api.SetPageSegMode(psm)
-        self.api.SetVariable("tessedit_char_whitelist", whitelist)
-        self.api.SetImage(Image.fromarray(img))
-        text = self.api.GetUTF8Text().strip()
-        return text, float(self.api.MeanTextConf())
+    def read(self, img: np.ndarray, psm: int, whitelist: str = "",
+             lang: str | None = None) -> tuple[str, float]:
+        api = self._api(lang)
+        api.SetPageSegMode(psm)
+        api.SetVariable("tessedit_char_whitelist", whitelist)
+        api.SetImage(Image.fromarray(img))
+        text = api.GetUTF8Text().strip()
+        return text, float(api.MeanTextConf())
+
+    def words(self, img: np.ndarray, lang: str | None = None) -> tuple[str, list["Word"]]:
+        """한 줄 인식 결과 (전체 텍스트, 단어별 위치·신뢰도)."""
+        api = self._api(lang)
+        api.SetPageSegMode(7)
+        api.SetVariable("tessedit_char_whitelist", "")
+        api.SetImage(Image.fromarray(img))
+        api.Recognize()
+        text = api.GetUTF8Text().strip()
+        out, it = [], api.GetIterator()
+        level = self._t.RIL.WORD
+        while it is not None:
+            t = it.GetUTF8Text(level)
+            if t:
+                x0, _, x1, _ = it.BoundingBox(level)
+                out.append(Word(t, x0, x1, float(it.Confidence(level))))
+            if not it.Next(level):
+                break
+        return text, out
+
+
+@dataclass
+class Word:
+    text: str
+    x0: int
+    x1: int
+    conf: float
 
 
 # ---------- 이미지 처리 ----------
@@ -122,6 +162,14 @@ def render_page(pdf_path: str | Path, page_index: int, password: str | None = No
     finally:
         doc.close()
     return np.array(pil.convert("L"))
+
+
+def remove_background(gray: np.ndarray, threshold: int = 170) -> np.ndarray:
+    """옅은 회색(워터마크, 헤더 음영, 도장 번짐)을 흰색으로 지운다.
+    워터마크의 굵은 획이 괘선·글자로 잘못 인식되는 것을 막는다."""
+    out = gray.copy()
+    out[out > threshold] = 255
+    return out
 
 
 def _binarize(gray: np.ndarray) -> np.ndarray:
@@ -208,13 +256,163 @@ def _clean_text(text: str) -> str | None:
     return text or None
 
 
+def split_lines(clean: np.ndarray, min_height: int = 8) -> list[np.ndarray]:
+    """여러 줄이 든 셀을 줄 단위 이미지로 나눈다 (가로 투영의 빈 줄 기준).
+
+    "금", "품" 처럼 위아래로 쌓인 한글은 글자 안에도 빈 줄이 생기므로,
+    줄 높이에 비해 좁은 틈이나 너무 낮은 조각은 이웃 줄과 합친다."""
+    ink = (clean < 128).sum(axis=1)
+    rows = np.where(ink > 0)[0]
+    if rows.size == 0:
+        return []
+    bands, start, prev = [], rows[0], rows[0]
+    for r in rows[1:]:
+        if r - prev > 1:
+            bands.append([start, prev])
+            start = r
+        prev = r
+    bands.append([start, prev])
+    merged = True
+    while merged and len(bands) > 1:
+        merged = False
+        tall = max(b - a + 1 for a, b in bands)
+        for k in range(len(bands) - 1):
+            (a1, b1), (a2, b2) = bands[k], bands[k + 1]
+            gap = a2 - b1 - 1
+            small = min(b1 - a1 + 1, b2 - a2 + 1) < tall * 0.6
+            if gap < tall * 0.3 or (small and gap < tall * 0.6):
+                bands[k] = [a1, b2]
+                del bands[k + 1]
+                merged = True
+                break
+    strips = []
+    for a, b in bands:
+        if b - a + 1 < min_height:
+            continue
+        strip = clean[max(a - 6, 0):b + 7]
+        strips.append(cv2.copyMakeBorder(strip, 8, 8, 0, 0, cv2.BORDER_CONSTANT, value=255))
+    return strips
+
+
+_HANGUL = re.compile(r"[\uac00-\ud7a3]")
+_JAMO = re.compile(r"[\u3131-\u318e]")
+_JUNK = re.compile(r"[|\[\]{}!«»@#\\<>`]")
+LOW_CONF = 45      # 이보다 낮은 단어는 다른 엔진 결과와 비교
+LATIN_RECHECK = 75  # 한글 없는 단어가 이보다 낮으면 영문 엔진과 비교
+
+
+def _suspicious(w: Word) -> bool:
+    return w.conf < LOW_CONF or bool(_JUNK.search(w.text) or _JAMO.search(w.text))
+
+
+def _overlapping(words: list[Word], x0: int, x1: int, ratio: float = 0.4) -> list[Word]:
+    """x0~x1 구간과 겹치는 단어. 구간보다 훨씬 넓은 단어(줄 전체를 덮는 오인식)는 제외."""
+    return [w for w in words
+            if (min(w.x1, x1) - max(w.x0, x0)) / max(1, w.x1 - w.x0) >= ratio
+            and (w.x1 - w.x0) <= (x1 - x0) * 1.3 + 10]
+
+
+def _join(words: list[Word], height: int) -> str:
+    out = ""
+    for i, w in enumerate(words):
+        if i and w.x0 - words[i - 1].x1 > height * 0.22:
+            out += " "
+        out += w.text
+    return out
+
+
+def _reread_region(engine: OcrEngine, strip: np.ndarray, x0: int, x1: int,
+                   a_conf: float) -> str | None:
+    """의심 구간만 잘라 2배 확대 후 혼합/한글/영문 엔진으로 다시 읽어 가장 신뢰도 높은 결과."""
+    pad = strip.shape[0] // 8  # 이웃 글자가 섞여 중복되지 않도록 여백은 작게
+    crop = strip[:, max(x0 - pad, 0):min(x1 + pad, strip.shape[1])]
+    big = _upscale(crop)
+    best, best_conf = None, max(a_conf + 15, 50)
+    for lang in (None, "kor", "eng"):
+        text, conf = engine.read(big, psm=7, lang=lang)
+        text = _clean_text(text)
+        if text and conf > best_conf and not (_JUNK.search(text) or _JAMO.search(text)):
+            best, best_conf = text, conf
+    return best
+
+
+def read_line(engine: OcrEngine, strip: np.ndarray) -> str | None:
+    """한 줄 인식: 한영 혼합 엔진 결과를 기본으로, 의심 단어만 다른 엔진 결과로 바꾼다.
+
+    - 한영 혼합 엔진은 영문/숫자에 강하고, 한글 전용 엔진은 한글에 강하다.
+      예) "COREBLIDE(코어브릿지)": 혼합 → "COREBLIDE (20/24! 4])", 한글 전용 → "(코어브릿지)"
+    - 한글 없는 저신뢰 단어는 영문 전용 엔진과 비교. 예) "6609"(66점) → "Gen9"(84점)
+    """
+    text, words = engine.words(strip)
+    if not words:
+        return _clean_text(text)
+    h = strip.shape[0]
+    kor = eng = None
+    replace: list[tuple[int, int, str]] = []  # (A 단어 시작 idx, 끝 idx, 대체 문자열)
+    i = 0
+    while i < len(words):
+        w = words[i]
+        if not _suspicious(w):
+            if not _HANGUL.search(w.text) and w.conf < LATIN_RECHECK:
+                if eng is None:
+                    eng = engine.words(strip, "eng")[1]
+                cand = _overlapping(eng, w.x0, w.x1, 0.6)
+                if len(cand) == 1 and not _HANGUL.search(cand[0].text) \
+                        and cand[0].conf >= w.conf + 10 and cand[0].text != w.text:
+                    replace.append((i, i, cand[0].text))
+            i += 1
+            continue
+        j = i
+        while j + 1 < len(words) and _suspicious(words[j + 1]):
+            j += 1
+        x0, x1 = words[i].x0, words[j].x1
+        a_conf = sum(x.conf for x in words[i:j + 1]) / (j - i + 1)
+        has_junk = any(_JUNK.search(x.text) or _JAMO.search(x.text) for x in words[i:j + 1])
+        if kor is None:
+            kor = engine.words(strip, "kor")[1]
+        cand = _overlapping(kor, x0, x1)
+        best = None
+        if cand:
+            c_conf = sum(x.conf for x in cand) / len(cand)
+            c_text = _join(cand, h)
+            if c_conf >= a_conf + 10 or (has_junk and c_conf >= 60
+                                         and not (_JUNK.search(c_text) or _JAMO.search(c_text))):
+                best = c_text
+        if best is None:
+            best = _reread_region(engine, strip, x0, x1, a_conf)
+        if best is not None:
+            replace.append((i, j, best))
+        i = j + 1
+    if not replace:
+        return _clean_text(text)
+    # 혼합 엔진 텍스트의 띄어쓰기를 유지한 채 해당 단어 구간만 바꾼다
+    spans, pos = [], 0
+    for w in words:
+        k = text.find(w.text, pos)
+        if k < 0:
+            return _clean_text(text)
+        spans.append((k, k + len(w.text)))
+        pos = k + len(w.text)
+    out, last = "", 0
+    for a, b, new in replace:
+        out += text[last:spans[a][0]] + new
+        last = spans[b][1]
+    out += text[last:]
+    return _clean_text(out)
+
+
 def read_cell(engine: OcrEngine, cell: np.ndarray | None, kind: str = "") -> str | None:
     """셀 1개 인식. kind: qty/amount/period 이면 허용 문자를 제한한다."""
     if cell is None or not _has_ink(cell):
         return None
     wl = WHITELIST.get(kind, "")
     clean = _clean_cell(cell)
-    # 한 줄 모드(psm 7)가 괘선 잔여물에 강하다. 못 읽으면 여러 줄 모드(psm 6)로 한 번 더.
+    if not wl:
+        # 일반 열: 줄 단위로 나눠 읽고 줄바꿈을 유지한다 (제품명 + "-구성품" 여러 줄 셀)
+        lines = [t for t in (read_line(engine, s) for s in split_lines(clean)) if t]
+        if lines:
+            return "\n".join(lines)
+    # 숫자 열(또는 줄 분리 실패): 한 줄 모드(psm 7) → 여러 줄 모드(psm 6)
     for psm in (7, 6):
         text = _clean_text(engine.read(clean, psm=psm, whitelist=wl)[0])
         if text:
@@ -258,6 +456,7 @@ def read_table(engine: OcrEngine, gray: np.ndarray, ys: list[int], xs: list[int]
 # ---------- 방향 판별 ----------
 def orientation_score(engine: OcrEngine, gray: np.ndarray) -> tuple[int, float]:
     """(첫 열 패턴 일치 수, 평균 신뢰도). 표가 있으면 첫 열 셀만 읽어 빠르게 판별한다."""
+    gray = remove_background(gray)
     tables = detect_tables(gray)
     if tables:
         _, ys, xs = tables[0]
@@ -291,6 +490,7 @@ def choose_orientation(engine: OcrEngine, gray: np.ndarray) -> tuple[np.ndarray,
 def ocr_page(engine: OcrEngine, gray: np.ndarray) -> OcrPage:
     """페이지 이미지 1장을 OCR. 표 영역(괘선 안쪽)만 표로 만든다."""
     img, angle, conf = choose_orientation(engine, gray)
+    img = remove_background(img)
     tables = []
     for bbox, ys, xs in detect_tables(img):
         rows = read_table(engine, img, ys, xs)
