@@ -143,6 +143,24 @@ class OcrEngine:
                 break
         return text, out
 
+    def symbols(self, img: np.ndarray, lang: str | None = None) -> list["Word"]:
+        """한 줄 인식 결과를 글자(심볼) 단위 위치·신뢰도로 돌려준다."""
+        api = self._api(lang)
+        api.SetPageSegMode(7)
+        api.SetVariable("tessedit_char_whitelist", "")
+        api.SetImage(Image.fromarray(img))
+        api.Recognize()
+        out, it = [], api.GetIterator()
+        level = self._t.RIL.SYMBOL
+        while it is not None:
+            t = it.GetUTF8Text(level)
+            if t:
+                x0, _, x1, _ = it.BoundingBox(level)
+                out.append(Word(t, x0, x1, float(it.Confidence(level))))
+            if not it.Next(level):
+                break
+        return out
+
 
 @dataclass
 class Word:
@@ -296,19 +314,34 @@ def split_lines(clean: np.ndarray, min_height: int = 8) -> list[np.ndarray]:
 
 _HANGUL = re.compile(r"[\uac00-\ud7a3]")
 _JAMO = re.compile(r"[\u3131-\u318e]")
+_ALNUM = re.compile(r"[A-Za-z0-9]")
 _JUNK = re.compile(r"[|\[\]{}!«»@#\\<>`]")
 LOW_CONF = 45      # 이보다 낮은 단어는 다른 엔진 결과와 비교
 LATIN_RECHECK = 75  # 한글 없는 단어가 이보다 낮으면 영문 엔진과 비교
 
 
+_LATIN_WORD = re.compile(r"^[A-Za-z0-9.,*+\-/()]+$")
+_LATIN_LETTER = re.compile(r"[A-Za-z]")
+
+
 def _suspicious(w: Word) -> bool:
-    return w.conf < LOW_CONF or bool(_JUNK.search(w.text) or _JAMO.search(w.text))
+    """다른 엔진 결과로 바꿔 볼 단어. 깔끔한 영문/숫자 단어(COREBLIDE 등)는 한글로 덮어쓰지 않는다."""
+    if _JUNK.search(w.text) or _JAMO.search(w.text):
+        return True
+    return w.conf < LOW_CONF and not _LATIN_WORD.match(w.text)
+
+
+def _kor_candidate_ok(w: Word) -> bool:
+    """한글 엔진 단어 중 믿을 만한 것: 영문자가 없고, 숫자가 길게 섞이지 않은 것 ("6식"은 허용)."""
+    return not _LATIN_LETTER.search(w.text) and not re.search(r"\d{3,}", w.text)
 
 
 def _overlapping(words: list[Word], x0: int, x1: int, ratio: float = 0.4) -> list[Word]:
-    """x0~x1 구간과 겹치는 단어. 구간보다 훨씬 넓은 단어(줄 전체를 덮는 오인식)는 제외."""
+    """x0~x1 구간과 겹치는 단어. 구간보다 훨씬 넓은 단어(줄 전체를 덮는 오인식)와
+    중심이 구간 밖인 단어(이웃 글자, 예: 뒤의 "등")는 제외."""
     return [w for w in words
             if (min(w.x1, x1) - max(w.x0, x0)) / max(1, w.x1 - w.x0) >= ratio
+            and x0 - 3 <= (w.x0 + w.x1) / 2 <= x1 + 3
             and (w.x1 - w.x0) <= (x1 - x0) * 1.3 + 10]
 
 
@@ -322,82 +355,184 @@ def _join(words: list[Word], height: int) -> str:
 
 
 def _reread_region(engine: OcrEngine, strip: np.ndarray, x0: int, x1: int,
-                   a_conf: float) -> str | None:
+                   a_conf: float, max_len: int = 999) -> str | None:
     """의심 구간만 잘라 2배 확대 후 혼합/한글/영문 엔진으로 다시 읽어 가장 신뢰도 높은 결과."""
-    pad = strip.shape[0] // 8  # 이웃 글자가 섞여 중복되지 않도록 여백은 작게
+    pad = 2  # 이웃 글자가 섞이면 "등등" 처럼 중복된다
     crop = strip[:, max(x0 - pad, 0):min(x1 + pad, strip.shape[1])]
     big = _upscale(crop)
     best, best_conf = None, max(a_conf + 15, 50)
     for lang in (None, "kor", "eng"):
         text, conf = engine.read(big, psm=7, lang=lang)
         text = _clean_text(text)
-        if text and conf > best_conf and not (_JUNK.search(text) or _JAMO.search(text)):
+        if text and conf > best_conf and len(text) <= max_len \
+                and not (_JUNK.search(text) or _JAMO.search(text)):
             best, best_conf = text, conf
     return best
 
 
-def read_line(engine: OcrEngine, strip: np.ndarray) -> str | None:
-    """한 줄 인식: 한영 혼합 엔진 결과를 기본으로, 의심 단어만 다른 엔진 결과로 바꾼다.
+HANGUL_CONF = 85   # 한글 영역으로 확정할 한글 전용 엔진 글자 신뢰도
+_PUNCT = set("()[]-.,·")
 
-    - 한영 혼합 엔진은 영문/숫자에 강하고, 한글 전용 엔진은 한글에 강하다.
-      예) "COREBLIDE(코어브릿지)": 혼합 → "COREBLIDE (20/24! 4])", 한글 전용 → "(코어브릿지)"
-    - 한글 없는 저신뢰 단어는 영문 전용 엔진과 비교. 예) "6609"(66점) → "Gen9"(84점)
+
+SPACE_RATIO = 0.17  # 글자 사이 빈 픽셀 열이 줄 높이의 17% 이상이면 띄어쓰기 (단어 안 2~7px, 단어 사이 13px~ @300DPI)
+
+
+def _blank_run(strip: np.ndarray, a: int, b: int) -> int:
+    """a~b 열 사이에서 가장 긴 '잉크 없는 열'의 길이 = 실제 글자 간격."""
+    a, b = max(int(a), 0), min(int(b), strip.shape[1])
+    if b <= a:
+        return 0
+    blank = (strip[:, a:b] < 128).sum(axis=0) == 0
+    best = cur = 0
+    for c in blank:
+        cur = cur + 1 if c else 0
+        best = max(best, cur)
+    return best
+
+
+def _syllable_is_latin(w: Word, mixed: list[Word]) -> bool:
+    """혼합 엔진이 같은 자리를 영문자로 확실히(70점 이상) 읽었으면 한글이 아니다.
+    예) "COREBLIDE" 의 D, H 를 한글 엔진은 "니", "마" 로 읽는다."""
+    for m in mixed:
+        center = (m.x0 + m.x1) / 2
+        if w.x0 - 2 <= center <= w.x1 + 2 and _LATIN_LETTER.match(m.text) and m.conf >= 70:
+            return True
+    return False
+
+
+def _hangul_regions(syms: list[Word], mixed: list[Word] | None = None,
+                    strip: np.ndarray | None = None) -> list[tuple[int, int, str]]:
+    """한글 전용 엔진 글자 중 확실한 한글 음절 구간 [(x0, x1, 텍스트)].
+
+    - 신뢰도 HANGUL_CONF 이상인 음절이 이어진 구간 (사이의 괄호·하이픈도 포함)
+    - 음절 1개짜리는 앞뒤 글자와 겹치지 않을 때만 (영문 "8SFF" 의 F 를 "타"로 읽는 경우 제외)
     """
-    text, words = engine.words(strip)
-    if not words:
-        return _clean_text(text)
-    h = strip.shape[0]
-    kor = eng = None
-    replace: list[tuple[int, int, str]] = []  # (A 단어 시작 idx, 끝 idx, 대체 문자열)
-    i = 0
-    while i < len(words):
-        w = words[i]
-        if not _suspicious(w):
-            if not _HANGUL.search(w.text) and w.conf < LATIN_RECHECK:
-                if eng is None:
-                    eng = engine.words(strip, "eng")[1]
-                cand = _overlapping(eng, w.x0, w.x1, 0.6)
-                if len(cand) == 1 and not _HANGUL.search(cand[0].text) \
-                        and cand[0].conf >= w.conf + 10 and cand[0].text != w.text:
-                    replace.append((i, i, cand[0].text))
-            i += 1
-            continue
-        j = i
-        while j + 1 < len(words) and _suspicious(words[j + 1]):
-            j += 1
-        x0, x1 = words[i].x0, words[j].x1
-        a_conf = sum(x.conf for x in words[i:j + 1]) / (j - i + 1)
-        has_junk = any(_JUNK.search(x.text) or _JAMO.search(x.text) for x in words[i:j + 1])
-        if kor is None:
-            kor = engine.words(strip, "kor")[1]
-        cand = _overlapping(kor, x0, x1)
-        best = None
-        if cand:
-            c_conf = sum(x.conf for x in cand) / len(cand)
-            c_text = _join(cand, h)
-            if c_conf >= a_conf + 10 or (has_junk and c_conf >= 60
-                                         and not (_JUNK.search(c_text) or _JAMO.search(c_text))):
-                best = c_text
-        if best is None:
-            best = _reread_region(engine, strip, x0, x1, a_conf)
-        if best is not None:
-            replace.append((i, j, best))
-        i = j + 1
-    if not replace:
-        return _clean_text(text)
-    # 혼합 엔진 텍스트의 띄어쓰기를 유지한 채 해당 단어 구간만 바꾼다
-    spans, pos = [], 0
-    for w in words:
-        k = text.find(w.text, pos)
-        if k < 0:
-            return _clean_text(text)
-        spans.append((k, k + len(w.text)))
-        pos = k + len(w.text)
-    out, last = "", 0
-    for a, b, new in replace:
-        out += text[last:spans[a][0]] + new
-        last = spans[b][1]
-    out += text[last:]
+    regions, run = [], []
+
+    def close():
+        sy = [w for w in run if _HANGUL.match(w.text)]
+        if not sy:
+            return
+        while run and run[-1].text in _PUNCT and run[-1].text not in ")]":
+            run.pop()  # 끝에 붙은 여는 기호/하이픈은 영문 쪽에 남긴다
+        while run and run[0].text in _PUNCT and run[0].text not in "([":
+            run.pop(0)
+        if len(sy) == 1:
+            k = syms.index(sy[0])
+            prev = syms[k - 1] if k > 0 else None
+            nxt = syms[k + 1] if k + 1 < len(syms) else None
+            if (prev and prev.x1 > sy[0].x0 + 2) or (nxt and nxt.x0 < sy[0].x1 - 2) \
+                    or sy[0].conf < 90:
+                return
+        text = ""
+        for k, w in enumerate(run):
+            if k and strip is not None:
+                p = run[k - 1]
+                gap = _blank_run(strip, (p.x0 + p.x1) / 2, (w.x0 + w.x1) / 2)
+                if gap >= strip.shape[0] * SPACE_RATIO:
+                    text += " "
+            text += w.text
+        regions.append((run[0].x0, run[-1].x1, text))
+
+    for w in syms:
+        ok_syl = _HANGUL.match(w.text) and w.conf >= HANGUL_CONF \
+            and not (mixed and _syllable_is_latin(w, mixed))
+        ok_punct = w.text in _PUNCT and w.conf >= 80 and run
+        if ok_syl or ok_punct or (w.text in "([" and w.conf >= 80):
+            run.append(w)
+        else:
+            close()
+            run = []
+    close()
+    return regions
+
+
+def _read_latin(engine: OcrEngine, crop: np.ndarray) -> tuple[str | None, float]:
+    """한글 영역 밖(영문/숫자 위주) 조각: 혼합 엔진과 영문 엔진 중 나은 쪽.
+    혼합 엔진 결과에 한글이 있으면 그대로 쓴다 (한글 전용 엔진이 놓친 한글)."""
+    mixed, mc = engine.read(crop, psm=7)
+    mixed = _clean_text(mixed)
+    if mixed and len(_HANGUL.findall(mixed)) > 2:
+        return mixed, mc
+    eng, ec = engine.read(crop, psm=7, lang="eng")
+    eng = _clean_text(eng)
+    if not eng:
+        return mixed, mc
+    if not mixed:
+        return eng, ec
+    mt, et = mixed.split(), eng.split()
+    if len(mt) == len(et):
+        # 단어별 선택: 혼합 엔진이 숫자만("6609") 또는 한글 섞어("85타") 읽은 단어는 영문 엔진 단어로
+        out = []
+        for m, e in zip(mt, et):
+            use_eng = (m.isdigit() and len(_LATIN_LETTER.findall(e)) >= 2) \
+                or (_HANGUL.search(m) and _LATIN_WORD.match(e))
+            out.append(e if use_eng else m)
+        return " ".join(out), max(mc, ec)
+    if _HANGUL.search(mixed):
+        return mixed, mc
+    return (eng, ec) if ec >= mc - 10 else (mixed, mc)
+
+
+def _ink_cols(strip: np.ndarray, x0: int, x1: int) -> tuple[int, int] | None:
+    cols = np.where((strip[:, x0:x1] < 128).sum(axis=0) > 0)[0]
+    if cols.size == 0:
+        return None
+    return x0 + int(cols[0]), x0 + int(cols[-1]) + 1
+
+
+def _trim_glyph_tail(strip: np.ndarray, span: tuple[int, int], x0: int,
+                     h: int) -> tuple[int, int] | None:
+    """한글 엔진의 글자 상자가 실제 잉크보다 좁으면 영문 조각 끝에 다음 한글 글자의
+    앞부분이 붙는다. 한글 영역 바로 앞에서 끊기지 않고 이어진 잉크 덩어리는 잘라낸다."""
+    a, b = span
+    if b < x0 - 2:
+        return span
+    ink = (strip[:, a:b] < 128).sum(axis=0) > 0
+    k = len(ink) - 1
+    while k >= 0 and ink[k]:
+        k -= 1
+    if k < 0 or (len(ink) - 1 - k) > h * 0.6:  # 덩어리가 너무 크면 영문 글자일 수 있음
+        return span
+    trimmed = _ink_cols(strip, a, a + k + 1)
+    return trimmed
+
+
+def read_line(engine: OcrEngine, strip: np.ndarray) -> str | None:
+    """한 줄 인식 (한글/영문 영역 분할 방식).
+
+    1) 한글 전용 엔진이 확실히 읽은 한글 음절 구간을 확정  예) "코어브릿지", "스위치"
+    2) 나머지 구간은 이미지를 잘라 혼합/영문 엔진으로 따로 인식  예) "COREBLIDE(", "HP DL380 Gen9"
+    3) 조각 사이 간격으로 띄어쓰기 결정
+    단어 위치에 의존하지 않아 엔진 버전(Windows/Linux)에 따른 단어 분리 차이에 강하다.
+    """
+    h, w = strip.shape
+    regions = _hangul_regions(engine.symbols(strip, "kor"), engine.symbols(strip), strip)
+    pieces: list[tuple[int, int, str]] = []
+    cursor = 0
+    for x0, x1, text in regions + [(w, w, "")]:
+        span = _ink_cols(strip, cursor, max(cursor, x0 - 1))
+        if span and x0 < w:
+            span = _trim_glyph_tail(strip, span, x0, h)
+        if span and span[1] - span[0] >= 3:
+            a, b = span
+            crop = cv2.copyMakeBorder(strip[:, max(a - 3, 0):b + 3], 0, 0, 12, 12,
+                                      cv2.BORDER_CONSTANT, value=255)
+            latin, _ = _read_latin(engine, crop)
+            if not latin and b - a < h * 0.6:  # 줄 앞 "-" 같은 기호 한 글자
+                latin = _clean_text(engine.read(crop, psm=10, whitelist="-~*+().,")[0])
+            latin = (latin or "").strip("‘’'`!:;|“”")
+            if latin:
+                pieces.append((a, b, latin))
+        if text:
+            pieces.append((x0, x1, text))
+        cursor = x1 + 1
+    out = ""
+    for k, (a, b, t) in enumerate(pieces):
+        if k and _blank_run(strip, pieces[k - 1][1] - 4, a + 4) >= h * SPACE_RATIO:
+            out += " "
+        out += t
+    out = re.sub(r"^~\s", "- ", out)  # 줄 앞 글머리 "-" 를 "~" 로 읽는 경우
     return _clean_text(out)
 
 

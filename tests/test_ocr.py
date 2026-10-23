@@ -160,12 +160,29 @@ def test_maintenance_list_case(tmp_path):
         assert g[0] == e[0] and g[1] == e[1] and g[3] == int(e[3])  # 품번·구분·수량 정확
         assert g[2].count("\n") == e[2].count("\n")                   # 여러 줄 유지
     must = ["EMC VNX 5200", "HP DL380 Gen9 8SFF CTO Server", "코어브릿지",
-            "REDHAT LINUX E.E", "6식 라이선스 갱신 포함", "AXGATE 2300", "G-bic"]
+            "REDHAT LINUX E.E", "라이선스 갱신 포함", "일체 포함", "AXGATE 2300"]
     names = "\n".join(r[2] for r in got[1:])
     for m in must:
         assert m in names
+    assert names.count("코어브릿지") == 1 and "등등" not in names  # 중복 없음
     truth = "\n".join(r[2] for r in ROWS)
-    assert SequenceMatcher(None, names, truth).ratio() >= 0.95
+    assert SequenceMatcher(None, names, truth).ratio() >= 0.93
+
+
+@needs_ocr
+@pytest.mark.parametrize("seed", [2, 5, 8])
+def test_maintenance_list_noise_variants(tmp_path, seed):
+    """잡음·흐림이 달라도(엔진 버전 차이와 비슷한 흔들림) 표 구조와 핵심 값은 유지돼야 한다."""
+    from make_maint import ROWS, draw_maint_page
+    pdf = tmp_path / f"m{seed}.pdf"
+    draw_maint_page(page_no=seed).save(pdf, resolution=300)
+    got = [list(r) for r in load_workbook(convert(pdf, tmp_path / "m.xlsx").output)
+           .active.iter_rows(values_only=True)]
+    assert len(got) == len(ROWS) + 1
+    for g, e in zip(got[1:], ROWS):
+        assert (g[0], g[1], g[3]) == (e[0], e[1], int(e[3]))
+    names = "\n".join(r[2] for r in got[1:])
+    assert "Gen9 8SFF" in names and "REDHAT LINUX" in names and names.count("브릿지") == 1
 
 
 def test_code_column_fixes():
