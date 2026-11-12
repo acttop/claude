@@ -13,6 +13,16 @@ npm test        # 단위 테스트 (node:test)
 npm run build   # 정적 사이트를 out/ 에 생성 (어떤 정적 호스팅에도 배포 가능)
 ```
 
+## 배포 (GitHub Pages)
+
+- 주소: https://acttop.github.io/claude/upi/
+- `gh-pages` 브랜치의 `upi/` 폴더에 정적 빌드 결과물을 올리는 방식 (다른 앱과 동일)
+
+```bash
+PAGES_BASE_PATH=/claude/upi npm run build   # out/ 생성
+# out/ 내용을 gh-pages 브랜치 upi/ 폴더에 복사 후 커밋·푸시
+```
+
 ## 기능
 
 | 탭 | 기능 | 예시 |
